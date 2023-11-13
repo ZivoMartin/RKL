@@ -108,7 +108,7 @@ impl Interpreteur {
         }
     }
 
-    fn clean_the_condition(&self, mut cond: String) -> Option<String>{
+    fn clean_the_condition(&self, mut cond: String, &arg, HashMap::<String, String>) -> Option<String>{
         let _ = cond.replace("  ", " ");
         let cloned_cond_or = cond.clone();
         let split_or: Vec<&str> = cloned_cond_or.split("OR").collect();
@@ -130,7 +130,7 @@ impl Interpreteur {
             i += 1;
         }
         cond = split_and.join("AND");
-        for i in 0..7{
+        for i in 0..6{
             let mut split: Vec::<String> = cond.split(self.type_gestion.get_nth_operator(i)).map(String::from).collect();
             let mut j = 0;
             for i in 0..split.len(){
@@ -179,8 +179,11 @@ impl Interpreteur {
                             if p_split.len() != 2 || !self.is_correct_name(p_split[0]) || !self.is_correct_name(p_split[1]){
                                 return None;
                             }
+                            arg.insert(p_split[1].to_string(), p_split[0].to_string());
                         }else if !self.is_correct_name(&space_split[i]){
                             return None;
+                        }else{
+                            arg.insert(space_split[i].to_string(), String::from(""));
                         }
                     }
                 }

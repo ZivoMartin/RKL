@@ -28,8 +28,34 @@ impl System{
             "INSERT" => self.insert_line(arg),
             "DELETE_LINE" => self.delete_line(arg[":table_name"], arg[":primary"]),
             "DELETE_TABLE" => self.delete_table(arg[":table_name"]),
+            "DELETE_LINE_IF" => self.delete_line_if(arg),
             _ => println!("La commande {} n'a pas encore été configurée..", type_request)
         }
+    }
+
+    fn delete_line_if(&mut self, arg: HashMap::<&str, &str>){
+        let table_name = arg.remove(":table_name").unwrap();
+        let condition = arg.remove(":condition").unwrap();
+        if self.table_exist(table_name){
+            let mut table_file = TextFile::new(&format!("text_files/{}", tab_name));
+            let text = table_file.get_text();
+            for p_key in text.split("\n"){
+                let line_file = TextFile::new(format!("text_files/{}_line_{}", tab_name, p_key));
+                let bool_string_for_this_line = self.build_bool_string(condition.clone(), line_file, &arg);
+                if self.type_gestion.descript_a_string_bool(&bool_string_for_this_line){
+                    self.delete_line(&table_name, &p_key);
+                }
+            }
+        }else{
+            println!("The table {} don't exist", table_name);
+        }
+    }
+
+    fn build_bool_string(&self, line_file: TextFile, bool_string: String, &arg: HashMap::<&str, &str>) -> String{
+        let mut result = String::from();
+        let keys: Vec::<&str> = argmy_map.keys().cloned().collect();
+        let text = line_file.get_text();
+        
     }
 
     fn create_table(&mut self, mut arg: HashMap<&str, &str>) {
@@ -138,6 +164,10 @@ impl System{
         }
     }
 
+    // fn get_element_from(&mut self, arg: Vec<&str>) -> Vec::<Vec::<String>>{
+        
+    // }
+    
     fn get_primary_key(&self, table_name: &str) -> String{
         TextFile::new(format!("text_files/data_{}", table_name)).get_text().split("\n").nth(0).unwrap().split_whitespace().nth(0).unwrap().to_string()
     }
