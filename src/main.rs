@@ -1,3 +1,6 @@
+mod system;
+use crate::system::System;
+
+
 fn main() {
-    println!("Hello, world!");
 }
