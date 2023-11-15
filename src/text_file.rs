@@ -1,6 +1,6 @@
 use std::fs;
 use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io;
 use std::path::PathBuf;
 
 
@@ -11,15 +11,16 @@ pub struct TextFile{
 
 impl TextFile{
 
-    fn new(file_path: String) -> TextFile{
-        let file: File;
-        if !file_exists(&file_path){
-            file = File::create(&file_path)?;
-        }else{
-            file = File::open(&file_path)?;
-        }
-        TextFile{file_path: file_path, file: file}
-
+    pub fn new(file_path: String) -> io::Result<TextFile> {
+        let file = if !file_exists(&file_path) {
+            File::create(&file_path)?
+        } else {
+            File::open(&file_path)?
+        };
+        Ok(TextFile {
+            file_path: PathBuf::from(&file_path),
+            file,
+        })
     }
 
     fn push(&self, text: &str){}
