@@ -29,10 +29,10 @@ impl TextFile{
                 process::exit(0);
             }
         }
-        Ok(TextFile {
+        TextFile {
             file_path: PathBuf::from(&file_path),
             file: file
-        })
+        }
     }
 
     pub fn push(&mut self, text: &str){
@@ -83,7 +83,7 @@ fn file_exists(file_path: &str) -> bool {
 }
 
 fn create_file(file_path: &str){
-    File::create(&file_path).map_err(|e|{
+    let _ = File::create(&file_path).map_err(|e|{
         println!("Erreur lors de la creation du fichier {}: {}", file_path, e);
     });
 }

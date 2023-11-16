@@ -21,11 +21,12 @@ impl System{
         println!("{}", self.main_file.get_text());
     }
 
-    pub fn create_table(&mut self, arg: Vec::<String>){
-        println!("{}", self.get_nb_line_file(self.main_file));
+    pub fn create_table(&mut self, arg: Vec<String>) {
+        let nb_lines = self.get_nb_line_file();
+        println!("{}", nb_lines);
     }
-
-    fn get_nb_line_file(&self, file: TextFile) -> i32{
-        file.get_text().split("\n").collect::<String>().len().as_i32();
+    
+    fn get_nb_line_file(&mut self) -> i32 {
+        self.main_file.get_text().split('\n').count() as i32
     }
 }
