@@ -1,7 +1,11 @@
 use std::fs;
 use std::fs::File;
 use std::io;
+use std::io::Write;
 use std::path::PathBuf;
+use std::io::BufRead;
+use std::io::Seek;
+use std::process;
 
 
 pub struct TextFile{
@@ -9,30 +13,68 @@ pub struct TextFile{
     file: File
 }
 
+#[allow(dead_code)]
 impl TextFile{
 
-    pub fn new(file_path: String) -> io::Result<TextFile> {
-        let file = if !file_exists(&file_path) {
-            File::create(&file_path)?
-        } else {
-            File::open(&file_path)?
-        };
+    pub fn new(file_path: String) -> TextFile {
+        if !file_exists(&file_path){
+            create_file(&file_path);
+        }
+        let file : File; 
+        match fs::OpenOptions::new().append(true).read(true).open(&file_path){
+            Ok(f) => {
+                file = f;
+            }Err(e) => {
+                println!("Erreur lors de l'ouverture du fichier {}: {}", file_path, e);
+                process::exit(0);
+            }
+        }
         Ok(TextFile {
             file_path: PathBuf::from(&file_path),
-            file,
+            file: file
         })
     }
 
-    fn push(&self, text: &str){}
-
-    fn actualise(&self, text: &str){}
-
-    fn erase(&self){}
-
-    fn get_text(&self) -> String {
-        String::new()
+    pub fn push(&mut self, text: &str){
+        self.file.write_all(text.as_bytes())
+        .map_err(|e|{
+            println!("L'ajout du texte a la fin du fichier a echoué: {}", e);
+        }).unwrap_or_else(|_| {});
     }
 
+    pub fn reset(&mut self, new_text: &str){
+        self.file.set_len(0)
+        .map_err(|e|{
+            println!("Le reset du texte a echoué: {}", e);
+        }).unwrap_or_else(|_| {});
+        self.push(new_text);
+    }
+
+    pub fn erase(&self){
+        fs::remove_file(&self.file_path)
+        .map_err(|e| {
+            println!("Le fichier n'a pas été supprimé: {}", e);
+        }).unwrap_or_else(|_| {});
+    }
+
+
+    pub fn get_text(&mut self) -> String {
+        let _ = self.file.seek(std::io::SeekFrom::Start(0));
+        let mut result = String::new();
+        let lines = io::BufReader::new(&self.file).lines();
+        for line in lines {
+            match line {
+                Ok(the_line) => {
+                    result.push_str(&the_line);
+                    result.push_str("\n");
+                }Err(e) => {
+                    println!("Erreur lors de la lecture de la ligne {}", e);
+                    return result;
+                }
+            }
+        }
+        result
+    }
 }
 
 
@@ -40,21 +82,8 @@ fn file_exists(file_path: &str) -> bool {
     fs::metadata(file_path).is_ok()
 }
 
-    // // Ouverture d'un fichier en mode lecture
-    // let mut file = File::open("mon_fichier.txt")?;
-
-    // // Lecture du contenu du fichier dans une chaîne
-    // let mut content = String::new();
-    // file.read_to_string(&mut content)?;
-
-    // println!("Contenu du fichier : {}", content);
-
-    // // Ouverture ou création d'un fichier en mode écriture
-    // let mut new_file = File::create("nouveau_fichier.txt")?;
-
-    // // Écriture dans le fichier
-    // new_file.write_all(b"Hello, Rust!")?;
-
-    // println!("Le fichier a été créé avec succès.");
-
-    // Ok(())
+fn create_file(file_path: &str){
+    File::create(&file_path).map_err(|e|{
+        println!("Erreur lors de la creation du fichier {}: {}", file_path, e);
+    });
+}
