@@ -75,10 +75,15 @@ impl TextFile{
         }
         result
     }
+
+    pub fn replace(&mut self, text_to_replace: &str, new_text: &str){
+        let new_txt = self.get_text().replace(text_to_replace, new_text);
+        self.reset(&new_txt);
+    }
 }
 
 
-fn file_exists(file_path: &str) -> bool {
+pub fn file_exists(file_path: &str) -> bool {
     fs::metadata(file_path).is_ok()
 }
 
