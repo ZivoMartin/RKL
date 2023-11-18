@@ -17,13 +17,14 @@ impl System{
         System{main_file: main_file, nb_table: nb_line}
     }
 
-    pub fn new_request(&mut self, mut arg: Vec<&str>){
+    pub fn new_request(&mut self, mut arg: Vec<&str>){  
         let type_request = arg[0];
         arg.remove(0);
         match type_request{
             "CREATE" => self.create_table(arg),
             "INSERT" => self.insert_line(arg),
             "DELETE_LINE" => self.delete_line(arg),
+            "DELETE_TABLE" => self.delete_table(arg),
             _ => println!("La commande {} n'a pas encore été configurée..", type_request)
         }
     }
@@ -70,7 +71,7 @@ impl System{
                 }
             }
             if arg_correct && i == arg.len() && !file_exists(&line_file_name){
-                tab_file.push(&line_file_name);
+                tab_file.push(arg[1]);
                 let mut line_file = TextFile::new(line_file_name);
                 line_file.push(&line_text);
             }
@@ -124,6 +125,17 @@ impl System{
                 }
             }
             line_file.erase();
+        }
+    }
+
+    fn delete_table(&mut self, arg: Vec<&str>){
+        if self.table_exist(arg[0]){
+            let mut tab_file = TextFile::new(format!("text_files/{}", arg[0]));
+            let text = tab_file.get_text();
+            for line in text.lines(){
+                self.delete_line(vec!{arg[0], line});
+            }
+            tab_file.erase();
         }
     }
 }
