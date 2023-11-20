@@ -80,9 +80,9 @@ impl System{
         }
     }
 
-    fn get_element_from(&mut self, arg: Vect<&str>) -> Vect::<Vect::<String>>{
+    // fn get_element_from(&mut self, arg: Vec<&str>) -> Vec::<Vec::<String>>{
         
-    }
+    // }
 
 
     fn push_new_txt(&self, mut txt1: String, txt2: &str, potential_path: &str) -> String{
