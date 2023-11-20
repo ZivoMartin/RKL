@@ -1,13 +1,14 @@
 mod system;
 mod text_file;
+mod interpreteur;
 
-use crate::system::System;
+use crate::interpreteur::Interpreteur;
 
 #[allow(unused_variables)]
 #[allow(unused_assignments)]
 fn main() {
-    let mut system = System::new();
-    system.new_request(vec!("DELETE_TABLE", "Humain"));
-    system.new_request(vec!{"CREATE", "Humain", "INT id", "BOOL vivant", "INT age", "STRING name", "BOOL sexe"});
-    system.new_request(vec!{"INSERT", "Humain", "0", "true", "20", "Joah est le mec le plus idiot\nde tout les temps", "false"});
+    let mut interpreteur = Interpreteur::new() 
+    interpreteur.sqlrequest("DROP TABLE Humain;");
+    interpreteur.sqlrequest("CREATE TABLE Humain(id INT PRIMARY KEY, name VARCHAR(50), age INT, BOOL vivant DEFAULT true);")
+    interpreteur.sqlrequest("INSERT INTO ma_table (id, nom, age, email) VALUES (1, 'John Doe', 30);");
 }
