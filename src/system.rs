@@ -22,7 +22,7 @@ impl System{
     }
 
     pub fn new_request(&mut self, mut arg: HashMap<&str, &str>){  
-        let type_request = arg.remove("request").unwrap();
+        let type_request = arg.remove(":request").unwrap();
         match type_request{
             "CREATE" => self.create_table(arg),
             "INSERT" => self.insert_line(Vec::<&str>::new()),
@@ -32,7 +32,7 @@ impl System{
         }
     }
 
-    fn create_table(&mut self, arg: HashMap<&str, &str>) {
+    fn create_table(&mut self, mut arg: HashMap<&str, &str>) {
         let new_table_name = arg.remove(":table_name").unwrap();
         let new_table_path = format!("text_files/{}", new_table_name);
         let new_table_data_path = format!("text_files/data_{}", new_table_name);
@@ -42,7 +42,7 @@ impl System{
             TextFile::new(new_table_path);
             let mut new_table_data_file = TextFile::new(new_table_data_path);
             let primary_key = arg.remove(":primary").unwrap();
-            new_table_data_file.push(&format!("{} {}", primary_key, arg.remove(primary_key).unwrap()));
+            new_table_data_file.push(&format!("{} {}\n", primary_key, arg.remove(primary_key).unwrap()));
             for (var_name, type_var) in &arg{
                 if !var_name.starts_with("$") && !var_name.starts_with(":"){
                     let split_type: Vec::<&str> = type_var.split_whitespace().collect();
@@ -50,11 +50,11 @@ impl System{
                         1 => new_table_data_file.push(&format!("{} {}\n", &var_name, split_type[0])),
                         2 => {
                             match split_type[1]{
-                                "DEFAUT" => {
-                                    let value = arg[&format!("${}", &var_name)];
-                                    let content = format!("{} {} DEFAULT {}\n", var_name, split_type[0], value);
+                                "DEFAULT" => {
+                                    let content = format!("{} {} DEFAULT {}\n", var_name, split_type[0], arg[&format!("${}", &var_name) as &str]);
                                     new_table_data_file.push(&content);
-                                }
+                                },
+                                _ => println!("To many arguments")
                             }
                         },
                         _ => println!("To many arguments")

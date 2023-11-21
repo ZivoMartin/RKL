@@ -10,7 +10,6 @@ pub struct Interpreteur {
 
 
 impl Interpreteur {
-
     pub fn new() -> Interpreteur{
         Interpreteur{
             system: System::new(),
@@ -22,16 +21,21 @@ impl Interpreteur {
     pub fn sqlrequest(&mut self, mut req: String){
         if req != "" && req.pop() == Some(';') && !req.contains("  "){
             let mut vect_req: Vec<&str> = req.split(" ").collect();
-            match vect_req[0]{
+            let type_request = vect_req.remove(0);
+            match type_request{
                 "DROP" => {
-                    vect_req.remove(0);
                     self.drop_req(vect_req);
                 }
                 "CREATE" => {
-                    vect_req.remove(0);
                     self.create_req(vect_req);
                 }
-
+                "INSERT" => {
+                    if vect_req.len() >= 5 && vect_req.remove(0) == "INTO" && vect_req.contains(&"VALUES"){
+                        self.insert_request(vect_req);
+                    }else{
+                        println!("Invalid request.")
+                    }
+                }
                 _ => {
                     println!("{} is unnknow by the system.", vect_req[0]);
                 }
@@ -45,13 +49,13 @@ impl Interpreteur {
     fn drop_req(&mut self, vect_req: Vec::<&str>){
         if vect_req.len() >= 2{
             let mut arguments = HashMap::<&str, &str>::new();
+            arguments.insert(":request", "DELETE_TABLE");
             match vect_req[0]{
                 "TABLE" => {
-                    arguments.insert(":request", vect_req[0]);
-                    arguments.insert(":table_name", "");
                     for table_to_drop in vect_req.iter().skip(1){
-                        arguments[":table_name"] = table_to_drop;
-                        self.system.new_request(arguments);
+                        arguments.insert(":table_name", table_to_drop);
+                        self.system.new_request(arguments.clone());
+                        arguments.remove(":table_name");
                     }
                 }
                 _ => {}
@@ -61,7 +65,49 @@ impl Interpreteur {
         }
     }
 
-    fn create_req(&self, mut vect_req: Vec::<&str>){
+    // id,name,age  1,'Joah',30
+
+    fn insert_request(&mut self, mut vect_req: Vec::<&str>){
+        let arguments = HashMap::<String, String>::new();
+        let table_name = arguments.remove(0).unwrap();
+        if self.is_correct_name(&table_name){
+            arguments.insert(":table_name".to_string(), table_name.to_string());
+            let req = vect_req.join(" ");
+            req.replace(", ", ",");
+            let split_req_value: Vec<&str> = req.split(" VALUE ").collect();
+            if split_req_value.len() == 2{
+                let arg_s = split_req_value[0].to_string();
+                let values_s = split_req_value[1].to_string();
+                if arg_s.remove(0) == '(' && arg_s.pop() == Some(')') && values_s.remove(0) == '(' && values_s.pop() == Some(';') && values_s.pop() == Some(')'){
+                    let values: Vec<String> = values_s.split(",").collect();
+                    let args: Vec<String> = arg_s.split(",").map(String::from).collect();
+                    if values.len() == args.len(){
+                        for i in 0..values.len(){
+                            if self.is_correct_name(args[i]){
+                                if values[i][0] == "'" && values[i].pop() != Some("'"){
+                                    println!("You forgot to close this: '");
+                                }else{
+                                    arguments.insert(args[i].to_string(), values[i].to_string());
+                                }
+                            }
+                        }
+                        let result = HashMap::<&str, &str>::new();
+                        self.convert_in_str_hashmap(&arguments, &result);
+                        println!("{:?}", result);
+                    }else{
+                        println!("It seems like the number of values is different then the number of arguments");
+                    }
+                } 
+            }else{
+                println!("Invalid request.");
+            }
+        }else{
+            println!("The name {} isn't valid", table_name);
+        }
+
+    }
+
+    fn create_req(&mut self, mut vect_req: Vec::<&str>){
         if vect_req.len() >= 2{
             let thing_to_create = vect_req.remove(0);
             match thing_to_create{
@@ -76,7 +122,8 @@ impl Interpreteur {
                         if self.is_correct_name(table_name) && splited_req_for_name.len() >= 2{
                             let arg_string = splited_req_for_name.join("(");
                             let virgule_split: Vec::<&str> = arg_string.split(",").collect();
-                            let mut arguments = HashMap::new();
+                            let mut arguments = HashMap::<String, String>::new();
+                            arguments.insert(":request".to_string(), "CREATE".to_string());
                             arguments.insert(":table_name".to_string(), table_name.to_string());
                             for arg in virgule_split{
                                 let mut splited_arg: Vec::<&str> = arg.split_whitespace().collect();
@@ -127,7 +174,10 @@ impl Interpreteur {
                                 }
                                 
                             }
-                            println!("{:?}", arguments);
+                            let mut result = HashMap::<&str, &str>::new();
+                            self.convert_in_str_hashmap(&arguments, &mut result);
+                            self.system.new_request(result);
+
                         }else{
                             println!("Erreur lors de la creation de la table {}", table_name)
                         }
@@ -151,5 +201,12 @@ impl Interpreteur {
         true
     }
 
+    fn convert_in_str_hashmap<'a>(&self, hashmap_to_convert: &'a HashMap<String, String>, result: &mut HashMap<&'a str, &'a str>) {
+        for (cle, value) in hashmap_to_convert {
+            let cle_str: &'a str = cle.as_str();
+            let value_str: &'a str = value.as_str();
+            result.insert(cle_str, value_str);
+        }
+    }
     
 }

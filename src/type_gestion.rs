@@ -56,7 +56,7 @@ impl TypeGestion{
         }
     }
 
-    fn is_correct_type(&self, tested_type: &str) -> bool{
+    pub fn is_correct_type(&self, tested_type: &str) -> bool{
         if !tested_type.starts_with("VARCHAR"){
             self.authorized_type.contains(&tested_type) 
         }else{
@@ -65,7 +65,7 @@ impl TypeGestion{
                 t.remove(0);
             }
             if t.remove(0) == '(' && t.pop() == Some(')'){
-                return self.type_gestion.is_int(&t);
+                return self.is_int(&t);
             }else{
                 return false;
             }
