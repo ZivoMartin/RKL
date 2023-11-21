@@ -1,22 +1,21 @@
 use crate::system::System;
 use std::collections::HashMap;
-use crate::system::good_type_and_good_value;
-use crate::system::is_int;
+use crate::type_gestion::TypeGestion;
 
 pub struct Interpreteur {
     system: System,
     authorized_char_for_variable: &'static str,
-    authorized_type: Vec<&'static str>,
+    type_gestion: TypeGestion
 }
+
 
 impl Interpreteur {
 
     pub fn new() -> Interpreteur{
         Interpreteur{
             system: System::new(),
-            authorized_char_for_variable: "azertyuiopqsdfghjklmwxcvbnAZERTYUIOPQSDFGHJKLMWXCVBN1234567890-_)",
-            authorized_type: vec!{"BIT", "CHAR", "DATETIME", "DECIMAL", "FLOAT",
-            "INT", "MONEY", "NUMERIC", "REAL", "SMALLDATETIME", "SMALLINT", "SMALLMONEY", "TINYINT", "VARCHAR", "BOOL"}
+            authorized_char_for_variable: "azertyuiopqsdfghjklmwxcvbnAZERTYUIOPQSDFGHJKLMWXCVBN1234567890-_",
+            type_gestion: TypeGestion::new()
         }
     }
 
@@ -45,10 +44,14 @@ impl Interpreteur {
 
     fn drop_req(&mut self, vect_req: Vec::<&str>){
         if vect_req.len() >= 2{
+            let mut arguments = HashMap::<&str, &str>::new();
             match vect_req[0]{
                 "TABLE" => {
+                    arguments.insert(":request", vect_req[0]);
+                    arguments.insert(":table_name", "");
                     for table_to_drop in vect_req.iter().skip(1){
-                        self.system.new_request(vec!{"DELETE_TABLE", table_to_drop});
+                        arguments[":table_name"] = table_to_drop;
+                        self.system.new_request(arguments);
                     }
                 }
                 _ => {}
@@ -80,7 +83,7 @@ impl Interpreteur {
                                 let column_name = splited_arg.remove(0);
                                 let type_data = splited_arg.remove(0);
                                 let mut bonus_param = String::new();
-                                if self.is_correct_name(column_name) && self.is_correct_type(type_data){
+                                if self.is_correct_name(column_name) && self.type_gestion.is_correct_type(type_data){
                                     let mut p_key = false;
                                     if splited_arg.len() > 0{
                                         let mut other = splited_arg.join(" ");
@@ -104,7 +107,7 @@ impl Interpreteur {
                                                     for _ in 0..8{
                                                         other.remove(0);
                                                     }
-                                                    if good_type_and_good_value(type_data, &other){
+                                                    if self.type_gestion.good_type_and_good_value(type_data, &other){
                                                         bonus_param = String::from("DEFAULT");
                                                         arguments.insert(format!("${}", String::from(column_name)), other);
                                                     }else{
@@ -117,7 +120,7 @@ impl Interpreteur {
                                         }   
                                     }
                                     arguments.insert(String::from(column_name), type_data.to_string()+" "+&bonus_param);
-                                }else if !self.is_correct_type(type_data){
+                                }else if !self.type_gestion.is_correct_type(type_data){
                                     println!("Le type {} n'est pas accepté.", {type_data});
                                 }else{
                                     println!("Le nom {} n'est pas accepté.", {column_name});
@@ -148,19 +151,5 @@ impl Interpreteur {
         true
     }
 
-    fn is_correct_type(&self, tested_type: &str) -> bool{
-        if !tested_type.starts_with("VARCHAR"){
-            self.authorized_type.contains(&tested_type) 
-        }else{
-            let mut t = tested_type.to_string(); 
-            for _ in 0..7{
-                t.remove(0);
-            }
-            if t.remove(0) == '(' && t.pop() == Some(')'){
-                return is_int(&t);
-            }else{
-                return false;
-            }
-        }
-    }
+    
 }

@@ -1,6 +1,7 @@
 mod system;
 mod text_file;
 mod interpreteur;
+mod type_gestion;
 
 use crate::interpreteur::Interpreteur;
 
@@ -9,6 +10,6 @@ use crate::interpreteur::Interpreteur;
 fn main() {
     let mut interpreteur = Interpreteur::new();
     interpreteur.sqlrequest(String::from("DROP TABLE Humain;"));
-    interpreteur.sqlrequest(String::from("CREATE TABLE Humain(id INT PRIMARY KEY, name VARCHAR(50), age INT, vivant BOOL DEFAULT 3);"))
+    //interpreteur.sqlrequest(String::from("CREATE TABLE Humain(id INT PRIMARY KEY, name VARCHAR(50), age INT, vivant BOOL DEFAULT 3);"))
     // interpreteur.sqlrequest("INSERT INTO ma_table (id, nom, age, email) VALUES (1, 'John Doe', 30);");
 }

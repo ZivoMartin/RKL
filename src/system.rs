@@ -1,12 +1,16 @@
 use crate::text_file::TextFile;
 use crate::text_file::file_exists;
+use crate::type_gestion::TypeGestion;
 use std::str::FromStr;
 use std::any::type_name;
+use std::collections::HashMap;
 
 pub struct System{
     main_file: TextFile,
-    nb_table: i32
+    nb_table: i32,
+    type_gestion: TypeGestion
 }
+
 
 #[allow(dead_code)]
 impl System{
@@ -14,23 +18,22 @@ impl System{
     pub fn new() -> System{
         let mut main_file = TextFile::new(String::from("text_files/main_file.txt"));
         let nb_line = get_nb_line_file(&mut main_file);
-        System{main_file: main_file, nb_table: nb_line}
+        System{main_file: main_file, nb_table: nb_line, type_gestion: TypeGestion::new()}
     }
 
-    pub fn new_request(&mut self, mut arg: Vec<&str>){  
-        let type_request = arg[0];
-        arg.remove(0);
+    pub fn new_request(&mut self, mut arg: HashMap<&str, &str>){  
+        let type_request = arg.remove("request").unwrap();
         match type_request{
             "CREATE" => self.create_table(arg),
-            "INSERT" => self.insert_line(arg),
-            "DELETE_LINE" => self.delete_line(arg),
-            "DELETE_TABLE" => self.delete_table(arg),
+            "INSERT" => self.insert_line(Vec::<&str>::new()),
+            "DELETE_LINE" => self.delete_line(arg[":table_name"], arg[":primary"]),
+            "DELETE_TABLE" => self.delete_table(arg[":table_name"]),
             _ => println!("La commande {} n'a pas encore été configurée..", type_request)
         }
     }
 
-    fn create_table(&mut self, arg: Vec<&str>) {
-        let new_table_name = arg[0];
+    fn create_table(&mut self, arg: HashMap<&str, &str>) {
+        let new_table_name = arg.remove(":table_name").unwrap();
         let new_table_path = format!("text_files/{}", new_table_name);
         let new_table_data_path = format!("text_files/data_{}", new_table_name);
         if !self.table_exist(new_table_name){
@@ -38,8 +41,25 @@ impl System{
             self.main_file.push(&format!("{}\n", new_table_name));
             TextFile::new(new_table_path);
             let mut new_table_data_file = TextFile::new(new_table_data_path);
-            for data in arg{
-                new_table_data_file.push(&format!("{}\n", data));
+            let primary_key = arg.remove(":primary").unwrap();
+            new_table_data_file.push(&format!("{} {}", primary_key, arg.remove(primary_key).unwrap()));
+            for (var_name, type_var) in &arg{
+                if !var_name.starts_with("$") && !var_name.starts_with(":"){
+                    let split_type: Vec::<&str> = type_var.split_whitespace().collect();
+                    match split_type.len(){
+                        1 => new_table_data_file.push(&format!("{} {}\n", &var_name, split_type[0])),
+                        2 => {
+                            match split_type[1]{
+                                "DEFAUT" => {
+                                    let value = arg[&format!("${}", &var_name)];
+                                    let content = format!("{} {} DEFAULT {}\n", var_name, split_type[0], value);
+                                    new_table_data_file.push(&content);
+                                }
+                            }
+                        },
+                        _ => println!("To many arguments")
+                    }
+                }
             }
         }
     }
@@ -59,7 +79,7 @@ impl System{
                 let type_data = splited_line.nth(0).unwrap();
                 let mut data_name = splited_line.nth(0).unwrap();
                 if data_name != "DEFAULT"{
-                    if !good_type_and_good_value(&type_data, &arg[i]){
+                    if !self.type_gestion.good_type_and_good_value(&type_data, &arg[i]){
                         arg_correct = false;
                         break;
                     }
@@ -107,10 +127,10 @@ impl System{
 
     
 
-    fn delete_line(&mut self, arg: Vec<&str>){
-        let line_file_path = format!("text_files/{}_line_{}", arg[0], arg[1]);
-        if self.table_exist(arg[0]) && file_exists(&line_file_path){
-            let mut table_file = TextFile::new(format!("text_files/{}", arg[0]));
+    fn delete_line(&mut self, table_name: &str, primary_key: &str){
+        let line_file_path = format!("text_files/{}_line_{}", table_name, primary_key);
+        if self.table_exist(table_name) && file_exists(&line_file_path){
+            let mut table_file = TextFile::new(format!("text_files/{}", table_name));
             table_file.replace(&format!("{}\n", line_file_path), "");                                                                                                                                                                                                                                                                                                      
             let line_file = TextFile::new(line_file_path);
             self.clear_line_file(line_file);
@@ -157,15 +177,15 @@ impl System{
     //             let mut float_tab : Vec<f32> = Vec::new();
     //             let mut int_tab : Vec<i32> = Vec::new();
     //             for data in &arg_data_vect{
-    //                 let the_arg = self.get_good_data(line_text.split("\n").nth(data.0 as usize).unwrap().to_string());
+    //                 let the_arg = self.type_gestion.get_good_data(line_text.split("\n").nth(data.0 as usize).unwrap().to_string());
     //                 match data.1{
-    //                     "INT" => int_tab.push(self.convert_with_good_type::<i32>(data.1, &the_arg)),
-    //                     "FLOAT" => float_tab.push(self.convert_with_good_type::<f32>(data.1, &the_arg)),
-    //                     "BOOL" => match self.convert_with_good_type::<i32>(data.1, &the_arg){
+    //                     "INT" => int_tab.push(self.type_gestion.convert_with_good_type::<i32>(data.1, &the_arg)),
+    //                     "FLOAT" => float_tab.push(self.type_gestion.convert_with_good_type::<f32>(data.1, &the_arg)),
+    //                     "BOOL" => match self.type_gestion.convert_with_good_type::<i32>(data.1, &the_arg){
     //                         1 => bool_tab.push(true),
     //                         _ => bool_tab.push(false)
     //                     },
-    //                     _ => string_tab.push(self.convert_with_good_type::<String>(data.1, &the_arg))
+    //                     _ => string_tab.push(self.type_gestion.convert_with_good_type::<String>(data.1, &the_arg))
     //                 }
     //             }
     //             if closure(int_tab, string_tab, bool_tab, float_tab){
@@ -175,45 +195,6 @@ impl System{
     //     }
     // }
 
-
-    // fn delete_line_if(&mut self, mut arg: Vec<&str>){
-    //     let table_name = arg.remove(0);
-    //     let condition = arg.remove(0);
-    //     if self.table_exist(table_name){
-    //         let mut tab_file = TextFile::new(format!("text_files/{}", table_name));
-    //         let mut data_file = TextFile::new(format!("text_files/data_{}", table_name));
-    //         let text = tab_file.get_text();
-    //         let mut arg_data_vect: Vec<(i32, &str)> = Vec::new();
-    //         for param in arg{
-    //             arg_data_vect.push(self.get_arg_data(&mut data_file, param));
-    //         }
-    //         for line in text.lines(){
-    //             let mut line_file = TextFile::new(format!("text_files/{}_line_{}", table_name, line));
-    //             let line_text = line_file.get_text();
-    //             let mut bool_tab : Vec<bool> = Vec::new();
-    //             let mut string_tab : Vec<String> = Vec::new();
-    //             let mut float_tab : Vec<f32> = Vec::new();
-    //             let mut int_tab : Vec<i32> = Vec::new();
-    //             for data in &arg_data_vect{
-    //                 let the_arg = self.get_good_data(line_text.split("\n").nth(data.0 as usize).unwrap().to_string());
-    //                 match data.1{
-    //                     "INT" => int_tab.push(self.convert_with_good_type::<i32>(data.1, &the_arg)),
-    //                     "FLOAT" => float_tab.push(self.convert_with_good_type::<f32>(data.1, &the_arg)),
-    //                     "BOOL" => match self.convert_with_good_type::<i32>(data.1, &the_arg){
-    //                         1 => bool_tab.push(true),
-    //                         _ => bool_tab.push(false)
-    //                     },
-    //                     _ => string_tab.push(self.convert_with_good_type::<String>(data.1, &the_arg))
-    //                 }
-    //             }
-    //             if closure(int_tab, string_tab, bool_tab, float_tab){
-    //                 self.clear_line_file(line_file);
-    //             }
-    //         }
-    //     }else{
-    //         prinln!("Table {} doesn't exist for now", table_name);
-    //     }
-    // }
 
 
     fn get_good_data(&mut self, mut value: String) -> String{
@@ -238,16 +219,16 @@ impl System{
         return (-1, String::new());
     }   
 
-    fn delete_table(&mut self, arg: Vec<&str>){
-        if self.table_exist(arg[0]){
-            let mut tab_file = TextFile::new(format!("text_files/{}", arg[0]));
+    fn delete_table(&mut self, table_name: &str){
+        if self.table_exist(table_name){
+            let mut tab_file = TextFile::new(format!("text_files/{}", table_name));
             let text = tab_file.get_text();
             for line in text.lines(){
-                self.delete_line(vec!{arg[0], line});
+                self.delete_line(table_name, line);
             }
             tab_file.erase();
-            TextFile::new(format!("text_files/data_{}", arg[0])).erase();
-            self.main_file.replace(&format!("{}\n", arg[0]), "");
+            TextFile::new(format!("text_files/data_{}", table_name)).erase();
+            self.main_file.replace(&format!("{}\n", table_name), "");
         }
     }
 }
@@ -258,44 +239,6 @@ fn get_nb_line_file(file: &mut TextFile) -> i32 {
 
 
 
-pub fn is_int(string : &str) -> bool{
-    let numbers = "1234567890";
-    for chara in string.chars(){
-        if !numbers.contains(chara.clone()){
-            return false;
-        } 
-    }
-    true
-}
-
-fn is_float(string : &str) -> bool{
-    let numbers = "1234567890";
-    let mut point = false;
-    let mut i = 0;
-    for chara in string.chars(){
-        if !numbers.contains(chara.clone()){
-            return false;
-        }else if chara == '.'{
-            if point || i == string.len() - 1{
-                return false;
-            }
-            point = true;
-        }else{
-            return false;
-        }
-        i += 1;
-    }
-    true
-}
-
-pub fn good_type_and_good_value(type_value: &str, value: &str) -> bool{
-    match type_value{
-        "BOOL" => return value == "false" || value == "true",
-        "STRING" => return true,
-        "INT" => return is_int(value),
-        _ => return is_float(value)
-    }
-}
 
 
 // fn descript_a_string_bool(bool_string : String, s: i32, e: i32) -> String{
@@ -331,14 +274,6 @@ fn compare_to_valid_element<T:
         "<=" => return first <= second,
         ">=" => return first >= second,
         _ => return first == second,
-    }
-}
-
-#[allow(dead_code)]
-fn and_or_operation(left: &str, operator: &str, right: &str) -> bool{
-    match operator{
-        "AND" => return left == "true" && right == "true",
-        _ => return left == "true" || right == "true"
     }
 }
 
