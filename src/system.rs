@@ -3,8 +3,6 @@ use crate::text_file::file_exists;
 use std::str::FromStr;
 use std::any::type_name;
 
-#[allow(dead_code)]
-
 pub struct System{
     main_file: TextFile,
     nb_table: i32
@@ -61,7 +59,7 @@ impl System{
                 let type_data = splited_line.nth(0).unwrap();
                 let mut data_name = splited_line.nth(0).unwrap();
                 if data_name != "DEFAULT"{
-                    if !self.good_type_and_good_value(&type_data, &arg[i]){
+                    if !good_type_and_good_value(&type_data, &arg[i]){
                         arg_correct = false;
                         break;
                     }
@@ -107,15 +105,7 @@ impl System{
     }
     
 
-    fn good_type_and_good_value(&mut self, type_value: &str, value: &str) -> bool{
-        match type_value{
-            "BOOL" => return value == "false" || value == "true",
-            "STRING" => return true,
-            "INT" => return is_int(value),
-            "FLOAT" => return is_float(value),
-            _ => return self.table_exist(value)
-        }
-    }
+    
 
     fn delete_line(&mut self, arg: Vec<&str>){
         let line_file_path = format!("text_files/{}_line_{}", arg[0], arg[1]);
@@ -298,6 +288,16 @@ fn is_float(string : &str) -> bool{
     true
 }
 
+pub fn good_type_and_good_value(type_value: &str, value: &str) -> bool{
+    match type_value{
+        "BOOL" => return value == "false" || value == "true",
+        "STRING" => return true,
+        "INT" => return is_int(value),
+        _ => return is_float(value)
+    }
+}
+
+
 // fn descript_a_string_bool(bool_string : String, s: i32, e: i32) -> String{
 //     vect = bool_string.split_whitespace.collect();
 //     for i in s..e{
@@ -313,7 +313,7 @@ fn is_float(string : &str) -> bool{
 // }
 
 
-
+#[allow(dead_code)]
 fn compare_to_valid_element<T: 
     std::str::FromStr + 
     std::default::Default + 
@@ -334,6 +334,7 @@ fn compare_to_valid_element<T:
     }
 }
 
+#[allow(dead_code)]
 fn and_or_operation(left: &str, operator: &str, right: &str) -> bool{
     match operator{
         "AND" => return left == "true" && right == "true",
@@ -341,6 +342,7 @@ fn and_or_operation(left: &str, operator: &str, right: &str) -> bool{
     }
 }
 
+#[allow(dead_code)]
 fn convert_with_good_type<T>(value: &str) -> T where T: FromStr + Default, {
     println!("{}", type_name::<T>());
     match type_name::<T>() {
