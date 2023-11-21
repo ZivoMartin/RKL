@@ -258,7 +258,7 @@ fn get_nb_line_file(file: &mut TextFile) -> i32 {
 
 
 
-fn is_int(string : &str) -> bool{
+pub fn is_int(string : &str) -> bool{
     let numbers = "1234567890";
     for chara in string.chars(){
         if !numbers.contains(chara.clone()){

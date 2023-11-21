@@ -1,6 +1,7 @@
 use crate::system::System;
 use std::collections::HashMap;
 use crate::system::good_type_and_good_value;
+use crate::system::is_int;
 
 pub struct Interpreteur {
     system: System,
@@ -15,7 +16,7 @@ impl Interpreteur {
             system: System::new(),
             authorized_char_for_variable: "azertyuiopqsdfghjklmwxcvbnAZERTYUIOPQSDFGHJKLMWXCVBN1234567890-_)",
             authorized_type: vec!{"BIT", "CHAR", "DATETIME", "DECIMAL", "FLOAT",
-            "INTEGER", "MONEY", "NUMERIC", "REAL", "SMALLDATETIME", "SMALLINT", "SMALLMONEY", "TINYINT", "VARCHAR"}
+            "INT", "MONEY", "NUMERIC", "REAL", "SMALLDATETIME", "SMALLINT", "SMALLMONEY", "TINYINT", "VARCHAR", "BOOL"}
         }
     }
 
@@ -64,14 +65,14 @@ impl Interpreteur {
                 "TABLE" => {
                     let mut new_table = String::from(vect_req.join(" "));
                     if new_table.pop() != Some(')'){
-                        println!("Syntax error lors de la creation d'une table.");
+                        println!("Une parenthèse a été mal fermée.");
                     }else{
                         _ = new_table.replace(", ", ",");
                         let mut splited_req_for_name: Vec::<&str> = new_table.split("(").collect();
                         let table_name = splited_req_for_name.remove(0);
                         if self.is_correct_name(table_name) && splited_req_for_name.len() >= 2{
-                            new_table = splited_req_for_name.join("(");
-                            let virgule_split: Vec::<&str> = new_table.split(",").collect();
+                            let arg_string = splited_req_for_name.join("(");
+                            let virgule_split: Vec::<&str> = arg_string.split(",").collect();
                             let mut arguments = HashMap::new();
                             arguments.insert(":table_name".to_string(), table_name.to_string());
                             for arg in virgule_split{
@@ -79,11 +80,11 @@ impl Interpreteur {
                                 let column_name = splited_arg.remove(0);
                                 let type_data = splited_arg.remove(0);
                                 let mut bonus_param = String::new();
-                                if self.authorized_type.contains(&type_data) && self.is_correct_name(column_name){
+                                if self.is_correct_name(column_name) && self.is_correct_type(type_data){
                                     let mut p_key = false;
                                     if splited_arg.len() > 0{
-                                        let other = splited_arg.join(" ");
-                                        match other{
+                                        let mut other = splited_arg.join(" ");
+                                        match &other[..]{
                                             "PRIMARY KEY" => {
                                                 if !p_key{
                                                     p_key = true;
@@ -100,7 +101,9 @@ impl Interpreteur {
                                             }
                                             _ => {
                                                 if other.starts_with("DEFAULT "){
-                                                    _ = other.replace("DEFAULT ", "");
+                                                    for _ in 0..8{
+                                                        other.remove(0);
+                                                    }
                                                     if good_type_and_good_value(type_data, &other){
                                                         bonus_param = String::from("DEFAULT");
                                                         arguments.insert(format!("${}", String::from(column_name)), other);
@@ -111,16 +114,17 @@ impl Interpreteur {
                                                     println!("Unknow {}", other);
                                                 }
                                             }
-                                        }
+                                        }   
                                     }
+                                    arguments.insert(String::from(column_name), type_data.to_string()+" "+&bonus_param);
+                                }else if !self.is_correct_type(type_data){
+                                    println!("Le type {} n'est pas accepté.", {type_data});
                                 }else{
-                                    println!("Syntax error");
+                                    println!("Le nom {} n'est pas accepté.", {column_name});
                                 }
-                                arguments.insert(String::from(column_name), type_data.to_string()+" "+&bonus_param);
+                                
                             }
                             println!("{:?}", arguments);
-                                
-
                         }else{
                             println!("Erreur lors de la creation de la table {}", table_name)
                         }
@@ -145,8 +149,18 @@ impl Interpreteur {
     }
 
     fn is_correct_type(&self, tested_type: &str) -> bool{
-        self.authorized_type.contains(&tested_type)
+        if !tested_type.starts_with("VARCHAR"){
+            self.authorized_type.contains(&tested_type) 
+        }else{
+            let mut t = tested_type.to_string(); 
+            for _ in 0..7{
+                t.remove(0);
+            }
+            if t.remove(0) == '(' && t.pop() == Some(')'){
+                return is_int(&t);
+            }else{
+                return false;
+            }
+        }
     }
-
-
 }
