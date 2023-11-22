@@ -25,7 +25,7 @@ impl System{
         let type_request = arg.remove(":request").unwrap();
         match type_request{
             "CREATE" => self.create_table(arg),
-            "INSERT" => self.insert_line(Vec::<&str>::new()),
+            "INSERT" => self.insert_line(arg),
             "DELETE_LINE" => self.delete_line(arg[":table_name"], arg[":primary"]),
             "DELETE_TABLE" => self.delete_table(arg[":table_name"]),
             _ => println!("La commande {} n'a pas encore été configurée..", type_request)
@@ -64,30 +64,42 @@ impl System{
         }
     }
 
-    fn insert_line(&mut self, arg: Vec<&str>) {
-        let name = arg[0];
+    fn insert_line(&mut self, arg: HashMap<&str, &str>) {
+        let name = arg.remove(":table_name").unwrap();
         if self.table_exist(name){
             let mut tab_file = TextFile::new(format!("text_files/{}", name));
             let mut data_file = TextFile::new(format!("text_files/data_{}", name));
-            let line_file_name = format!("text_files/{}_line_{}", name, arg[1]);
+            let line_file_name = format!("text_files/{}_line_{}", name, self.get_primary_key(&name));
             let mut arg_correct = true;
             let text = data_file.get_text();
             let mut i = 1;
             let mut line_text = String::new();
             for line in text.lines().skip(1) {
                 let mut splited_line = line.split_whitespace();
-                let type_data = splited_line.nth(0).unwrap();
                 let mut data_name = splited_line.nth(0).unwrap();
-                if data_name != "DEFAULT"{
-                    if !self.type_gestion.good_type_and_good_value(&type_data, &arg[i]){
-                        arg_correct = false;
-                        break;
-                    }
-                    line_text = self.push_new_txt(line_text, arg[i], &format!("{}_{}", line_file_name, data_name));
-                    i += 1;
-                }else{
-                    data_name = splited_line.nth(0).unwrap();
-                    line_text = self.push_new_txt(line_text, &splited_line.nth(0).unwrap(), &format!("{}_{}", line_file_name, data_name));
+                let mut data_type = splited_line.nth(0).unwrap();
+                if data_type.starts_with("VARCHAR"){
+                    data_type = "STRING"
+                }
+                
+                match splited_line.nth(0){
+                    Ok(next_word){
+                        match next_word{
+                            "DEFAULT" => {
+                                data_name = splited_line.nth(0).unwrap();
+                                line_text = self.push_new_txt(line_text, &splited_line.nth(0).unwrap(), &format!("{}_{}", line_file_name, data_name));
+                            }
+                            _ =>{
+                                if !self.type_gestion.good_type_and_good_value(&type_data, &arg[i]){
+                                    arg_correct = false;
+                                    break;
+                                }
+                                line_text = self.push_new_txt(line_text, arg[i], &format!("{}_{}", line_file_name, data_name));
+                                i += 1;
+                            }
+                        }
+                    },
+                    Err(_) => {} 
                 }
             }
             if arg_correct && i == arg.len() && !file_exists(&line_file_name){
@@ -95,13 +107,18 @@ impl System{
                 let mut line_file = TextFile::new(line_file_name);
                 line_file.push(&line_text);
             }
+        }else{
+            println!("La table {} n'éxiste pas.", name);
         }
     }
 
     // fn get_element_from(&mut self, arg: Vec<&str>) -> Vec::<Vec::<String>>{
         
     // }
-
+    
+    fn get_primary_key(&self, table_name: &str) -> String{
+        TextFile::new(&format("text_files/data_{}", table_name)).get_text().split("\n").nth(0).unwrap().split_whitespace().nth(0).unwrap();
+    }
 
     fn push_new_txt(&self, mut txt1: String, txt2: &str, potential_path: &str) -> String{
         if txt2.contains("\n"){
@@ -149,54 +166,6 @@ impl System{
         line_file.erase();
     }
 
-
-
-    // fn delete_line_if<F>(
-    //     &mut self,
-    //     mut arg: Vec<&str>,
-    //     closure: F,
-    // ) 
-    // where
-    //     F: Fn(Vec<i32>, Vec<String>, Vec<bool>, Vec<f32>) -> bool,
-    // {
-    //     let table_name = arg[0];
-    //     arg.remove(0);
-    //     if self.table_exist(table_name){
-    //         let mut tab_file = TextFile::new(format!("text_files/{}", table_name));
-    //         let mut data_file = TextFile::new(format!("text_files/data_{}", table_name));
-    //         let text = tab_file.get_text();
-    //         let mut arg_data_vect: Vec<(i32, &str)> = Vec::new();
-    //         for param in arg{
-    //             arg_data_vect.push(self.get_arg_data(&mut data_file, param));
-    //         }
-    //         for line in text.lines(){
-    //             let mut line_file = TextFile::new(format!("text_files/{}_line_{}", table_name, line));
-    //             let line_text = line_file.get_text();
-    //             let mut bool_tab : Vec<bool> = Vec::new();
-    //             let mut string_tab : Vec<String> = Vec::new();
-    //             let mut float_tab : Vec<f32> = Vec::new();
-    //             let mut int_tab : Vec<i32> = Vec::new();
-    //             for data in &arg_data_vect{
-    //                 let the_arg = self.type_gestion.get_good_data(line_text.split("\n").nth(data.0 as usize).unwrap().to_string());
-    //                 match data.1{
-    //                     "INT" => int_tab.push(self.type_gestion.convert_with_good_type::<i32>(data.1, &the_arg)),
-    //                     "FLOAT" => float_tab.push(self.type_gestion.convert_with_good_type::<f32>(data.1, &the_arg)),
-    //                     "BOOL" => match self.type_gestion.convert_with_good_type::<i32>(data.1, &the_arg){
-    //                         1 => bool_tab.push(true),
-    //                         _ => bool_tab.push(false)
-    //                     },
-    //                     _ => string_tab.push(self.type_gestion.convert_with_good_type::<String>(data.1, &the_arg))
-    //                 }
-    //             }
-    //             if closure(int_tab, string_tab, bool_tab, float_tab){
-    //                 self.clear_line_file(line_file);
-    //             }
-    //         }
-    //     }
-    // }
-
-
-
     fn get_good_data(&mut self, mut value: String) -> String{
         let type_data = value.remove(0);
         match type_data{
@@ -236,9 +205,6 @@ impl System{
 fn get_nb_line_file(file: &mut TextFile) -> i32 {
     (file.get_text().split('\n').count() - 1) as i32
 }
-
-
-
 
 
 // fn descript_a_string_bool(bool_string : String, s: i32, e: i32) -> String{
@@ -289,3 +255,48 @@ fn convert_with_good_type<T>(value: &str) -> T where T: FromStr + Default, {
         _ => String::from(value).parse().unwrap_or_default(),
     }
 }
+
+
+    // fn delete_line_if<F>(
+    //     &mut self,
+    //     mut arg: Vec<&str>,
+    //     closure: F,
+    // ) 
+    // where
+    //     F: Fn(Vec<i32>, Vec<String>, Vec<bool>, Vec<f32>) -> bool,
+    // {
+    //     let table_name = arg[0];
+    //     arg.remove(0);
+    //     if self.table_exist(table_name){
+    //         let mut tab_file = TextFile::new(format!("text_files/{}", table_name));
+    //         let mut data_file = TextFile::new(format!("text_files/data_{}", table_name));
+    //         let text = tab_file.get_text();
+    //         let mut arg_data_vect: Vec<(i32, &str)> = Vec::new();
+    //         for param in arg{
+    //             arg_data_vect.push(self.get_arg_data(&mut data_file, param));
+    //         }
+    //         for line in text.lines(){
+    //             let mut line_file = TextFile::new(format!("text_files/{}_line_{}", table_name, line));
+    //             let line_text = line_file.get_text();
+    //             let mut bool_tab : Vec<bool> = Vec::new();
+    //             let mut string_tab : Vec<String> = Vec::new();
+    //             let mut float_tab : Vec<f32> = Vec::new();
+    //             let mut int_tab : Vec<i32> = Vec::new();
+    //             for data in &arg_data_vect{
+    //                 let the_arg = self.type_gestion.get_good_data(line_text.split("\n").nth(data.0 as usize).unwrap().to_string());
+    //                 match data.1{
+    //                     "INT" => int_tab.push(self.type_gestion.convert_with_good_type::<i32>(data.1, &the_arg)),
+    //                     "FLOAT" => float_tab.push(self.type_gestion.convert_with_good_type::<f32>(data.1, &the_arg)),
+    //                     "BOOL" => match self.type_gestion.convert_with_good_type::<i32>(data.1, &the_arg){
+    //                         1 => bool_tab.push(true),
+    //                         _ => bool_tab.push(false)
+    //                     },
+    //                     _ => string_tab.push(self.type_gestion.convert_with_good_type::<String>(data.1, &the_arg))
+    //                 }
+    //             }
+    //             if closure(int_tab, string_tab, bool_tab, float_tab){
+    //                 self.clear_line_file(line_file);
+    //             }
+    //         }
+    //     }
+    // }

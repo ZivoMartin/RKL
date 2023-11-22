@@ -11,5 +11,5 @@ fn main() {
     let mut interpreteur = Interpreteur::new();
     interpreteur.sqlrequest(String::from("DROP TABLE Humain;"));
     interpreteur.sqlrequest(String::from("CREATE TABLE Humain(id INT PRIMARY KEY, name VARCHAR(50), age INT, vivant BOOL DEFAULT true);"));
-    interpreteur.sqlrequest("INSERT INTO Humain (id, name, age) VALUES (1, 'Joah', 30);");
+    interpreteur.sqlrequest(String::from("INSERT INTO Humain (id, name, age) VALUES (1, 'Joah', 30);"));
 }

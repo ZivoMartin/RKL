@@ -65,39 +65,42 @@ impl Interpreteur {
         }
     }
 
-    // id,name,age  1,'Joah',30
 
     fn insert_request(&mut self, mut vect_req: Vec::<&str>){
-        let arguments = HashMap::<String, String>::new();
-        let table_name = arguments.remove(0).unwrap();
+        let mut arguments = HashMap::<String, String>::new();
+        let table_name = vect_req.remove(0);
         if self.is_correct_name(&table_name){
             arguments.insert(":table_name".to_string(), table_name.to_string());
-            let req = vect_req.join(" ");
-            req.replace(", ", ",");
-            let split_req_value: Vec<&str> = req.split(" VALUE ").collect();
+            let mut req = vect_req.join(" ");
+            req = req.replace(", ", ",");
+            let split_req_value: Vec<&str> = req.split(" VALUES ").collect();
             if split_req_value.len() == 2{
-                let arg_s = split_req_value[0].to_string();
-                let values_s = split_req_value[1].to_string();
-                if arg_s.remove(0) == '(' && arg_s.pop() == Some(')') && values_s.remove(0) == '(' && values_s.pop() == Some(';') && values_s.pop() == Some(')'){
-                    let values: Vec<String> = values_s.split(",").collect();
+                let mut arg_s = split_req_value[0].to_string();
+                let mut values_s = split_req_value[1].to_string();
+                if arg_s.remove(0) == '(' && arg_s.pop() == Some(')') && values_s.remove(0) == '(' && values_s.pop() == Some(')'){
+                    let mut values: Vec<String> = values_s.split(",").map(String::from).collect();
                     let args: Vec<String> = arg_s.split(",").map(String::from).collect();
                     if values.len() == args.len(){
                         for i in 0..values.len(){
-                            if self.is_correct_name(args[i]){
-                                if values[i][0] == "'" && values[i].pop() != Some("'"){
+                            if self.is_correct_name(&args[i]){
+                                if values[i].chars().next() == Some('\'') && values[i].pop() != Some('\''){
                                     println!("You forgot to close this: '");
                                 }else{
                                     arguments.insert(args[i].to_string(), values[i].to_string());
                                 }
+                            }else{
+                                println!("Ce nom n'est pas correct pour une variable: {}", args[i]);
                             }
                         }
-                        let result = HashMap::<&str, &str>::new();
-                        self.convert_in_str_hashmap(&arguments, &result);
-                        println!("{:?}", result);
+                        let mut result = HashMap::<&str, &str>::new();
+                        self.convert_in_str_hashmap(&arguments, &mut result);
+                        self.system.new_request(result);
                     }else{
                         println!("It seems like the number of values is different then the number of arguments");
                     }
-                } 
+                }else{
+                    println!("La syntaxe de votre requete n'est pas bonne.");
+                }
             }else{
                 println!("Invalid request.");
             }
@@ -123,6 +126,7 @@ impl Interpreteur {
                             let arg_string = splited_req_for_name.join("(");
                             let virgule_split: Vec::<&str> = arg_string.split(",").collect();
                             let mut arguments = HashMap::<String, String>::new();
+                            let mut p_key = false;
                             arguments.insert(":request".to_string(), "CREATE".to_string());
                             arguments.insert(":table_name".to_string(), table_name.to_string());
                             for arg in virgule_split{
@@ -131,7 +135,6 @@ impl Interpreteur {
                                 let type_data = splited_arg.remove(0);
                                 let mut bonus_param = String::new();
                                 if self.is_correct_name(column_name) && self.type_gestion.is_correct_type(type_data){
-                                    let mut p_key = false;
                                     if splited_arg.len() > 0{
                                         let mut other = splited_arg.join(" ");
                                         match &other[..]{
@@ -166,7 +169,7 @@ impl Interpreteur {
                                             }
                                         }   
                                     }
-                                    arguments.insert(String::from(column_name), type_data.to_string()+" "+&bonus_param);
+                                    arguments.insert(String::from(column_name), type_data.to_string()+" "+&bonus_param);    
                                 }else if !self.type_gestion.is_correct_type(type_data){
                                     println!("Le type {} n'est pas accepté.", {type_data});
                                 }else{
@@ -174,10 +177,13 @@ impl Interpreteur {
                                 }
                                 
                             }
-                            let mut result = HashMap::<&str, &str>::new();
-                            self.convert_in_str_hashmap(&arguments, &mut result);
-                            self.system.new_request(result);
-
+                            if p_key{
+                                let mut result = HashMap::<&str, &str>::new();
+                                self.convert_in_str_hashmap(&arguments, &mut result);
+                                self.system.new_request(result);
+                            }else{
+                                println!("Vous n'avez pas explicitement indiqué de clé primaire");
+                            }
                         }else{
                             println!("Erreur lors de la creation de la table {}", table_name)
                         }

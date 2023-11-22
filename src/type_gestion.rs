@@ -48,7 +48,7 @@ impl TypeGestion{
             _ => return self.is_float(value)
         }
     }
-
+    #[allow(dead_code)]
     pub fn and_or_operation(&self, left: &str, operator: &str, right: &str) -> bool{
         match operator{
             "AND" => return left == "true" && right == "true",
