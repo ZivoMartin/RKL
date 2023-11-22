@@ -68,7 +68,9 @@ impl Interpreteur {
 
     fn insert_request(&mut self, mut vect_req: Vec::<&str>){
         let mut arguments = HashMap::<String, String>::new();
+        let mut result = HashMap::<&str, &str>::new();
         let table_name = vect_req.remove(0);
+        result.insert(":request", "INSERT");
         if self.is_correct_name(&table_name){
             arguments.insert(":table_name".to_string(), table_name.to_string());
             let mut req = vect_req.join(" ");
@@ -83,7 +85,7 @@ impl Interpreteur {
                     if values.len() == args.len(){
                         for i in 0..values.len(){
                             if self.is_correct_name(&args[i]){
-                                if values[i].chars().next() == Some('\'') && values[i].pop() != Some('\''){
+                                if values[i].chars().next() == Some('\'') && values[i].remove(0) == '\'' && values[i].pop() != Some('\''){
                                     println!("You forgot to close this: '");
                                 }else{
                                     arguments.insert(args[i].to_string(), values[i].to_string());
@@ -92,7 +94,7 @@ impl Interpreteur {
                                 println!("Ce nom n'est pas correct pour une variable: {}", args[i]);
                             }
                         }
-                        let mut result = HashMap::<&str, &str>::new();
+                        
                         self.convert_in_str_hashmap(&arguments, &mut result);
                         self.system.new_request(result);
                     }else{
@@ -142,6 +144,7 @@ impl Interpreteur {
                                                 if !p_key{
                                                     p_key = true;
                                                     arguments.insert(":primary".to_string(), String::from(column_name));
+                                                    bonus_param = "NOTNULL".to_string();
                                                 }else{
                                                     println!("Vous avez declaré une primary key à deux reprise, {} n'est donc pas une primary key.", column_name);
                                                 } 
@@ -150,7 +153,7 @@ impl Interpreteur {
                                                 bonus_param = "FOREIGN".to_string();
                                             }
                                             "NOT NULL" => {
-                                                bonus_param = "NOT NULL".to_string();
+                                                bonus_param = "NOTNULL".to_string();
                                             }
                                             _ => {
                                                 if other.starts_with("DEFAULT "){

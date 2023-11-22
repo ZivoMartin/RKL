@@ -64,46 +64,70 @@ impl System{
         }
     }
 
-    fn insert_line(&mut self, arg: HashMap<&str, &str>) {
+    fn insert_line(&mut self, mut arg: HashMap<&str, &str>) {
         let name = arg.remove(":table_name").unwrap();
         if self.table_exist(name){
             let mut tab_file = TextFile::new(format!("text_files/{}", name));
             let mut data_file = TextFile::new(format!("text_files/data_{}", name));
-            let line_file_name = format!("text_files/{}_line_{}", name, self.get_primary_key(&name));
+            let p_key = self.get_primary_key(&name);
+            let mut p_key_val = String::new();
+            let line_file_name = format!("text_files/{}_line_{}", name, p_key);
             let mut arg_correct = true;
             let text = data_file.get_text();
-            let mut i = 1;
             let mut line_text = String::new();
-            for line in text.lines().skip(1) {
+            for line in text.lines() {
                 let mut splited_line = line.split_whitespace();
-                let mut data_name = splited_line.nth(0).unwrap();
+                let data_name = splited_line.nth(0).unwrap();
                 let mut data_type = splited_line.nth(0).unwrap();
                 if data_type.starts_with("VARCHAR"){
                     data_type = "STRING"
                 }
-                
                 match splited_line.nth(0){
-                    Ok(next_word){
+                    Some(next_word) => {
+                        println!("{} {}", next_word, data_name);
                         match next_word{
-                            "DEFAULT" => {
-                                data_name = splited_line.nth(0).unwrap();
-                                line_text = self.push_new_txt(line_text, &splited_line.nth(0).unwrap(), &format!("{}_{}", line_file_name, data_name));
-                            }
-                            _ =>{
-                                if !self.type_gestion.good_type_and_good_value(&type_data, &arg[i]){
+                            "DEFAULT" => line_text = self.push_new_txt(line_text, &splited_line.nth(0).unwrap(), &format!("{}_{}", line_file_name, data_name)),
+                            "NOTNULL" => {
+                                let arg_in_request = arg.remove(data_name);
+                                match arg_in_request{
+                                    Some(val) => {
+                                        if !self.type_gestion.good_type_and_good_value(&data_type, &val){
+                                            arg_correct = false;
+                                            break;
+                                        } 
+                                        if data_name == p_key{
+                                            p_key_val = val.clone().to_string();
+                                        }
+                                        line_text = self.push_new_txt(line_text, val, &format!("{}_{}", line_file_name, data_name));
+                                    },
+                                    None =>  {
+                                        println!("La colonne {} ne peut pas etre nulle !", data_name);
+                                        arg_correct = false;
+                                        break;
+                                    }                               
+                                }   
+                            }_ =>{}
+                        }
+                    },
+                    None => {
+                        let arg_in_request = arg.remove(data_name);
+                        match arg_in_request{
+                            Some(val) => {
+                                if !self.type_gestion.good_type_and_good_value(&data_type, &val){
                                     arg_correct = false;
                                     break;
                                 }
-                                line_text = self.push_new_txt(line_text, arg[i], &format!("{}_{}", line_file_name, data_name));
-                                i += 1;
+                                line_text = self.push_new_txt(line_text, val, &format!("{}_{}", line_file_name, data_name));
                             }
+                            None =>  line_text = self.push_new_txt(line_text, "NULL", &format!("{}_{}", line_file_name, data_name))
                         }
-                    },
-                    Err(_) => {} 
+                        
+                        
+                    } 
                 }
             }
-            if arg_correct && i == arg.len() && !file_exists(&line_file_name){
-                tab_file.push(arg[1]);
+            if arg_correct && !file_exists(&line_file_name){
+                tab_file.push(&p_key_val);
                 let mut line_file = TextFile::new(line_file_name);
                 line_file.push(&line_text);
             }
@@ -117,7 +141,7 @@ impl System{
     // }
     
     fn get_primary_key(&self, table_name: &str) -> String{
-        TextFile::new(&format("text_files/data_{}", table_name)).get_text().split("\n").nth(0).unwrap().split_whitespace().nth(0).unwrap();
+        TextFile::new(format!("text_files/data_{}", table_name)).get_text().split("\n").nth(0).unwrap().split_whitespace().nth(0).unwrap().to_string();
     }
 
     fn push_new_txt(&self, mut txt1: String, txt2: &str, potential_path: &str) -> String{
@@ -198,6 +222,8 @@ impl System{
             tab_file.erase();
             TextFile::new(format!("text_files/data_{}", table_name)).erase();
             self.main_file.replace(&format!("{}\n", table_name), "");
+        }else{
+            println!("La table {} n'existe pas.", table_name);
         }
     }
 }
