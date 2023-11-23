@@ -71,4 +71,58 @@ impl TypeGestion{
             }
         }
     }
+
+    pub fn decript_a_line(&self, line: &str) -> bool{
+        let mut line_vec: Vec<&str> = line.split_whitespace().collect(); 
+        while line_vec.len() > 1{
+            let result = self.and_or_operation(line_vec[0], line_vec[1], line_vec[2]);
+            for _ in 0..3{
+                line_vec.remove(0);
+            }
+            if result{
+                line_vec.insert(0, "true");
+            }else{
+                line_vec.insert(0, "false");
+            }
+        }
+        return line_vec[0] == "true";
+    }
+
+    fn compare_to_valid_element(&self, left_s: &str, operator: &str, right_s: &str) -> bool{
+        let left: f32 = String::from(left_s).parse().unwrap_or_default();
+        let right: f32 = String::from(right_s).parse().unwrap_or_default();
+        match operator{
+            "==" => return left == right,
+            "!=" => return left != right,
+            ">" => return left > right,
+            "<" => return left < right,
+            ">=" => return left >= right,
+            "<=" => return left <= right,
+            _ => return false
+        }
+    }
+
+
+    pub fn convert_a_full_line(&self, line: &str) -> String{
+        let mut splited_line: Vec<&str> = line.split_whitespace().collect();
+        let mut s = splited_line.len();
+        let mut i = 0;
+        while i<s{
+            if splited_line[i] == "("{
+                let result = self.compare_to_valid_element(splited_line[i+1], splited_line[i+2], splited_line[i+3]);
+                for _ in 0..5{
+                    splited_line.remove(i);
+                }
+                if result{
+                    splited_line.insert(i, "true");
+                }else{
+                    splited_line.insert(i, "false");
+                }
+                
+                s -= 4;
+            }
+            i += 1;
+        }
+        return splited_line.join(" ")
+    }
 }

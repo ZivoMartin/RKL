@@ -37,24 +37,24 @@ impl TextFile{
 
     pub fn push(&mut self, text: &str){
         self.file.write_all(text.as_bytes())
-        .map_err(|e|{
+        .unwrap_or_else(|e|{
             println!("L'ajout du texte a la fin du fichier a echoué: {}", e);
-        }).unwrap_or_else(|_| {});
+        });
     }
 
     pub fn reset(&mut self, new_text: &str){
         self.file.set_len(0)
-        .map_err(|e|{
+        .unwrap_or_else(|e|{
             println!("Le reset du texte a echoué: {}", e);
-        }).unwrap_or_else(|_| {});
+        });
         self.push(new_text);
     }
 
     pub fn erase(&self){
         fs::remove_file(&self.file_path)
-        .map_err(|e| {
+        .unwrap_or_else(|e| {
             println!("Le fichier n'a pas été supprimé: {}", e);
-        }).unwrap_or_else(|_| {});
+        });
     }
 
 

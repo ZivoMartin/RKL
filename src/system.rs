@@ -22,6 +22,7 @@ impl System{
     }
 
     pub fn new_request(&mut self, mut arg: HashMap<&str, &str>){  
+        println!("{}", self.type_gestion.convert_a_full_line("( 1 <= 2 ) OR ( 3 == 3 ) OR ( 8 < 0 )")); 
         let type_request = arg.remove(":request").unwrap();
         match type_request{
             "CREATE" => self.create_table(arg),
@@ -70,66 +71,68 @@ impl System{
             let mut tab_file = TextFile::new(format!("text_files/{}", name));
             let mut data_file = TextFile::new(format!("text_files/data_{}", name));
             let p_key = self.get_primary_key(&name);
-            let mut p_key_val = String::new();
-            let line_file_name = format!("text_files/{}_line_{}", name, p_key);
-            let mut arg_correct = true;
-            let text = data_file.get_text();
-            let mut line_text = String::new();
-            for line in text.lines() {
-                let mut splited_line = line.split_whitespace();
-                let data_name = splited_line.nth(0).unwrap();
-                let mut data_type = splited_line.nth(0).unwrap();
-                if data_type.starts_with("VARCHAR"){
-                    data_type = "STRING"
-                }
-                match splited_line.nth(0){
-                    Some(next_word) => {
-                        println!("{} {}", next_word, data_name);
-                        match next_word{
-                            "DEFAULT" => line_text = self.push_new_txt(line_text, &splited_line.nth(0).unwrap(), &format!("{}_{}", line_file_name, data_name)),
-                            "NOTNULL" => {
+            let p_key_val_result = arg.remove(&p_key as &str);
+            match p_key_val_result{
+                Some(p_key_val) => {
+                    let line_file_name = format!("text_files/{}_line_{}", name, p_key_val);
+                    let mut arg_correct = true;
+                    let text = data_file.get_text();
+                    let mut line_text = format!("{}\n", p_key_val);
+                    for line in text.lines().skip(1) {
+                        let mut splited_line = line.split_whitespace();
+                        let data_name = splited_line.nth(0).unwrap();
+                        let mut data_type = splited_line.nth(0).unwrap();
+                        if data_type.starts_with("VARCHAR"){
+                            data_type = "STRING"
+                        }
+                        match splited_line.nth(0){
+                            Some(next_word) => {
+                                match next_word{
+                                    "DEFAULT" => line_text = self.push_new_txt(line_text, &splited_line.nth(0).unwrap(), &format!("{}_{}", line_file_name, data_name)),
+                                    "NOTNULL" => {
+                                        let arg_in_request = arg.remove(data_name);
+                                        match arg_in_request{
+                                            Some(val) => {
+                                                if !self.type_gestion.good_type_and_good_value(&data_type, &val){
+                                                    arg_correct = false;
+                                                    break;
+                                                } 
+                                                line_text = self.push_new_txt(line_text, val, &format!("{}_{}", line_file_name, data_name));
+                                            },
+                                            None =>  {
+                                                println!("La colonne {} ne peut pas etre nulle !", data_name);
+                                                arg_correct = false;
+                                                break;
+                                            }                               
+                                        }   
+                                    }_ =>{}
+                                }
+                            },
+                            None => {
                                 let arg_in_request = arg.remove(data_name);
                                 match arg_in_request{
                                     Some(val) => {
                                         if !self.type_gestion.good_type_and_good_value(&data_type, &val){
                                             arg_correct = false;
                                             break;
-                                        } 
-                                        if data_name == p_key{
-                                            p_key_val = val.clone().to_string();
                                         }
                                         line_text = self.push_new_txt(line_text, val, &format!("{}_{}", line_file_name, data_name));
-                                    },
-                                    None =>  {
-                                        println!("La colonne {} ne peut pas etre nulle !", data_name);
-                                        arg_correct = false;
-                                        break;
-                                    }                               
-                                }   
-                            }_ =>{}
-                        }
-                    },
-                    None => {
-                        let arg_in_request = arg.remove(data_name);
-                        match arg_in_request{
-                            Some(val) => {
-                                if !self.type_gestion.good_type_and_good_value(&data_type, &val){
-                                    arg_correct = false;
-                                    break;
+                                    }
+                                    None =>  line_text = self.push_new_txt(line_text, "NULL", &format!("{}_{}", line_file_name, data_name))
                                 }
-                                line_text = self.push_new_txt(line_text, val, &format!("{}_{}", line_file_name, data_name));
-                            }
-                            None =>  line_text = self.push_new_txt(line_text, "NULL", &format!("{}_{}", line_file_name, data_name))
+                                
+                                
+                            } 
                         }
-                        
-                        
-                    } 
+                    }
+                    if arg_correct && !file_exists(&line_file_name){
+                        tab_file.push(&p_key_val);
+                        let mut line_file = TextFile::new(line_file_name);
+                        line_file.push(&line_text);
+                    }
+                }None => {
+                    println!("Vous n'avez pas indiqué de clé primaire.");
                 }
-            }
-            if arg_correct && !file_exists(&line_file_name){
-                tab_file.push(&p_key_val);
-                let mut line_file = TextFile::new(line_file_name);
-                line_file.push(&line_text);
             }
         }else{
             println!("La table {} n'éxiste pas.", name);
@@ -141,7 +144,7 @@ impl System{
     // }
     
     fn get_primary_key(&self, table_name: &str) -> String{
-        TextFile::new(format!("text_files/data_{}", table_name)).get_text().split("\n").nth(0).unwrap().split_whitespace().nth(0).unwrap().to_string();
+        TextFile::new(format!("text_files/data_{}", table_name)).get_text().split("\n").nth(0).unwrap().split_whitespace().nth(0).unwrap().to_string()
     }
 
     fn push_new_txt(&self, mut txt1: String, txt2: &str, potential_path: &str) -> String{
@@ -233,6 +236,9 @@ fn get_nb_line_file(file: &mut TextFile) -> i32 {
 }
 
 
+
+
+
 // fn descript_a_string_bool(bool_string : String, s: i32, e: i32) -> String{
 //     vect = bool_string.split_whitespace.collect();
 //     for i in s..e{
@@ -249,29 +255,10 @@ fn get_nb_line_file(file: &mut TextFile) -> i32 {
 
 
 #[allow(dead_code)]
-fn compare_to_valid_element<T: 
-    std::str::FromStr + 
-    std::default::Default + 
-    std::cmp::PartialOrd
->(compare_string: String) -> bool{
 
-    let mut splited_string = compare_string.split_whitespace();
-    let first = convert_with_good_type::<T>(splited_string.nth(0).unwrap());
-    let operator = splited_string.nth(0).unwrap();
-    let second = convert_with_good_type::<T>(splited_string.nth(0).unwrap());
-
-    match operator{
-        "<" => return first < second,
-        ">" => return first > second,
-        "<=" => return first <= second,
-        ">=" => return first >= second,
-        _ => return first == second,
-    }
-}
 
 #[allow(dead_code)]
 fn convert_with_good_type<T>(value: &str) -> T where T: FromStr + Default, {
-    println!("{}", type_name::<T>());
     match type_name::<T>() {
         "bool" => match value {
             "true" => "1".parse().unwrap_or_default(),
