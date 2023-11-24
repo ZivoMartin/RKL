@@ -36,6 +36,9 @@ impl Interpreteur {
                         println!("Invalid request.")
                     }
                 }
+                "DELETE" => {
+                    self.delete_line(vect_req);
+                }
                 _ => {
                     println!("{} is unnknow by the system.", vect_req[0]);
                 }
@@ -43,7 +46,6 @@ impl Interpreteur {
         }else if req.pop() == Some(';') || !req.contains("  "){
             println!("Votre requête ne respecte pas les regles de syntaxe");
         }
-        
     }
 
     fn drop_req(&mut self, vect_req: Vec::<&str>){
@@ -65,6 +67,137 @@ impl Interpreteur {
         }
     }
 
+    fn delete_line(&mut self, mut vect_req: Vec::<&str>){
+        if vect_req.len() >= 2 && vect_req.remove(0) == "FROM"{
+            if vect_req[0].len() > 2 && self.is_correct_name(&vect_req[0]){
+                let table_name = vect_req.remove(0);
+                let mut arguments = HashMap::<String, String>::new();
+                let mut result = HashMap::<&str, &str>::new();
+                arguments.insert(String::from(":table_name"), table_name.to_string());
+                arguments.insert(String::from(":type_request"), String::from("DELETE_LINE_IF"));
+                if vect_req.len() == 0{
+                    arguments.insert(String::from(":condition"), String::from("1 == 1"));
+                    self.convert_in_str_hashmap(&arguments, &mut result);
+                    //self.system.new_request(result);
+                }else{
+                    let key_word = vect_req.remove(0); 
+                    match key_word{
+                        "WHERE" => {
+                            let condition = vect_req.join(" ");
+                            let cleaning = self.clean_the_condition(condition);
+                            match cleaning{
+                                Some(condition) => {
+                                    println!("{}", condition);
+                                    arguments.insert(String::from(":condition"), condition);
+                                    self.convert_in_str_hashmap(&arguments, &mut result);
+                                    //self.system.new_request(result);
+                                }
+                                None => println!("The condition is incorrect.")
+                            }
+                        }   
+                        _ => {
+                            println!("Bad key_word here: {}", key_word);
+                        }
+                    }
+                }
+            }else{
+                println!("Le nom de table indiqué n'est pas correct.");
+            }
+        }else{
+            println!("Votre requête de type DELETE n'est pas valide.");
+        }
+    }
+
+    fn clean_the_condition(&self, mut cond: String) -> Option<String>{
+        let _ = cond.replace("  ", " ");
+        let cloned_cond_or = cond.clone();
+        let split_or: Vec<&str> = cloned_cond_or.split("OR").collect();
+        let mut i = 0;
+        for elt in &split_or{
+            if elt.to_string() == "".to_string() || (elt.chars().next().unwrap() != ' ' && i != 0) || (elt.chars().rev().next().unwrap() != ' ' && i != split_or.len()-1){
+                return None;
+            }
+            i += 1;
+        }
+        cond = split_or.join("OR");
+        let cloned_cond_and = cond.clone();
+        let split_and: Vec<&str> = cloned_cond_and.split("AND").collect();
+        i = 0;
+        for elt in &split_and{
+            if elt.to_string() == String::from("") || (elt.chars().next().unwrap() != ' ' && i != 0) || (elt.chars().rev().next().unwrap() != ' ' && i != split_and.len()-1){
+                return None;
+            }
+            i += 1;
+        }
+        cond = split_and.join("AND");
+        for i in 0..7{
+            let mut split: Vec::<String> = cond.split(self.type_gestion.get_nth_operator(i)).map(String::from).collect();
+            let mut j = 0;
+            for i in 0..split.len(){
+                if split[i] == String::from(""){
+                    return None;
+                }
+                if split[i].chars().next().unwrap() != ' ' && j != 0{
+                    split[i] = String::from(" ") + &split[i];
+                } 
+                if split[i].chars().rev().next() != Some(' ') && j != split_and.len().try_into().unwrap(){
+                    split[i] += " ";
+                }
+                j+=1;
+            }
+            cond = split.join(self.type_gestion.get_nth_operator(i));
+        }
+        let mut space_split: Vec<String> = cond.split_whitespace().map(String::from).collect();
+        let mut i = 0;
+        while i<space_split.len(){
+            if self.type_gestion.operator_exist(&space_split[i]){
+                if self.type_gestion.operator_exist(&space_split[i-1]) || self.type_gestion.operator_exist(&space_split[i+1]){
+                    return None;
+                }  
+            }else{
+                if (i != 0 && !self.type_gestion.operator_exist(&space_split[i-1])) || (i != space_split.len()-1 && !self.type_gestion.operator_exist(&space_split[i+1]) && space_split[i].to_string().chars().next().unwrap() != '\''){
+                    return None;
+                } 
+                if !self.type_gestion.is_float(&space_split[i]){
+                    if space_split[i] == String::from("true"){
+                        space_split[i] = String::from("1");
+                    }else if space_split[i] == String::from("false"){
+                        space_split[i] = String::from("0");
+                    }else if space_split[i].chars().next() == Some('\''){
+                        space_split[i].remove(0);
+                        let mut the_string = String::from(space_split.remove(i));
+                        while i != space_split.len() && the_string.chars().rev().next().unwrap() != '\''{
+                            the_string += &space_split.remove(i);
+                        }
+                        if the_string.pop() != Some('\''){
+                            return None;
+                        }
+                        space_split.insert(i, format!("{}", self.hash_string_to_number(the_string)));
+                    }else{
+                        if space_split[i].contains("."){
+                            let p_split: Vec::<&str> = space_split[i].split(".").collect();
+                            if p_split.len() != 2 || !self.is_correct_name(p_split[0]) || !self.is_correct_name(p_split[1]){
+                                return None;
+                            }
+                        }else if !self.is_correct_name(&space_split[i]){
+                            return None;
+                        }
+                    }
+                }
+            }
+            i += 1;
+        }
+        Some(space_split.join(" "))
+    }   
+
+
+    fn hash_string_to_number(&self, string: String)->i32{
+        let mut result: i32 = 0;
+        for chara in string.chars(){
+            result += chara as i32;
+        }
+        result
+    }
 
     fn insert_request(&mut self, mut vect_req: Vec::<&str>){
         let mut arguments = HashMap::<String, String>::new();

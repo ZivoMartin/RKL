@@ -22,7 +22,6 @@ impl System{
     }
 
     pub fn new_request(&mut self, mut arg: HashMap<&str, &str>){  
-        println!("{}", self.type_gestion.convert_a_full_line("( 1 <= 2 ) OR ( 3 == 3 ) OR ( 8 < 0 )")); 
         let type_request = arg.remove(":request").unwrap();
         match type_request{
             "CREATE" => self.create_table(arg),
@@ -139,10 +138,6 @@ impl System{
         }
     }
 
-    // fn get_element_from(&mut self, arg: Vec<&str>) -> Vec::<Vec::<String>>{
-        
-    // }
-    
     fn get_primary_key(&self, table_name: &str) -> String{
         TextFile::new(format!("text_files/data_{}", table_name)).get_text().split("\n").nth(0).unwrap().split_whitespace().nth(0).unwrap().to_string()
     }

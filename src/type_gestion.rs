@@ -1,13 +1,25 @@
 
 pub struct TypeGestion{
     authorized_type: Vec<&'static str>,
+    operator_list: Vec<&'static str>
 }
 
 impl TypeGestion{
 
     pub fn new() -> TypeGestion{
-        TypeGestion{authorized_type: vec!{"BIT", "CHAR", "DATETIME", "DECIMAL", "FLOAT",
-        "INT", "MONEY", "NUMERIC", "REAL", "SMALLDATETIME", "SMALLINT", "SMALLMONEY", "TINYINT", "VARCHAR", "BOOL"},}
+        TypeGestion{
+            authorized_type: vec!{"BIT", "CHAR", "DATETIME", "DECIMAL", "FLOAT",
+            "INT", "MONEY", "NUMERIC", "REAL", "SMALLDATETIME", "SMALLINT", "SMALLMONEY", "TINYINT", "VARCHAR", "BOOL"},
+            operator_list: vec!{"<", ">", "<=", ">=", "==", "!=", "(", "AND", "OR"}
+        }
+    }
+
+    pub fn get_nth_operator(&self, n: i32)->&str{
+        self.operator_list[n as usize]
+    }
+
+    pub fn operator_exist(&self, op: &str)->bool{
+        self.operator_list.contains(&op)
     }
 
     pub fn is_int(&self, string : &str) -> bool{
@@ -26,14 +38,14 @@ impl TypeGestion{
         let mut i = 0;
         for chara in string.chars(){
             if !numbers.contains(chara.clone()){
-                return false;
-            }else if chara == '.'{
-                if point || i == string.len() - 1{
+                if chara == '.' && !point{
+                    if i == string.len() - 1{
+                        return false;
+                    }
+                    point = true;
+                }else{
                     return false;
                 }
-                point = true;
-            }else{
-                return false;
             }
             i += 1;
         }
@@ -48,13 +60,7 @@ impl TypeGestion{
             _ => return self.is_float(value)
         }
     }
-    #[allow(dead_code)]
-    pub fn and_or_operation(&self, left: &str, operator: &str, right: &str) -> bool{
-        match operator{
-            "AND" => return left == "true" && right == "true",
-            _ => return left == "true" || right == "true"
-        }
-    }
+    
 
     pub fn is_correct_type(&self, tested_type: &str) -> bool{
         if !tested_type.starts_with("VARCHAR"){
@@ -71,21 +77,66 @@ impl TypeGestion{
             }
         }
     }
+    
+    pub fn descript_a_string_bool(&self, exp: &str) -> bool{
+        self.evaluate_postfix_exp(&self.valid_infix_to_postfix(exp))
+    }
 
-    pub fn decript_a_line(&self, line: &str) -> bool{
-        let mut line_vec: Vec<&str> = line.split_whitespace().collect(); 
-        while line_vec.len() > 1{
-            let result = self.and_or_operation(line_vec[0], line_vec[1], line_vec[2]);
-            for _ in 0..3{
-                line_vec.remove(0);
-            }
-            if result{
-                line_vec.insert(0, "true");
+    fn valid_infix_to_postfix(&self, exp: &str) -> String{
+        let mut result = String::new();
+        let mut stack = Vec::<&str>::new();
+        let split_exp: Vec<&str> = exp.split_whitespace().collect();
+        for elt in split_exp{
+            if self.operator_list.contains(&elt){
+                while stack.len()>0 && stack.last().unwrap().to_string() != String::from("(") && self.get_priority(elt) < self.get_priority(stack.last().unwrap()){
+                    result.push_str(&format!(" {}", stack.pop().unwrap()));
+                }
+                stack.push(elt);
+            }else if elt == ")"{
+                while stack.last().unwrap().to_string() != String::from("(") {
+                    result.push_str(&format!(" {}", stack.pop().unwrap()));
+                }
+                stack.pop();
             }else{
-                line_vec.insert(0, "false");
+                result.push_str(&format!(" {}", elt));
             }
         }
-        return line_vec[0] == "true";
+        while stack.len() != 0 {
+            result.push_str(&format!(" {}", stack.pop().unwrap()));
+        }
+        result.remove(0);
+        println!("{}", result);
+        result
+    }
+
+
+    fn get_priority(&self, operator: &str) -> i32{
+        if operator == "AND" || operator == "OR"{
+            return 1;
+        }else if operator == "("{
+            return 3;
+        }else{
+            return 2;
+        }
+    }
+
+    fn evaluate_postfix_exp(&self, exp: &str) -> bool{
+        let mut stack = Vec::<&str>::new();
+        let split_exp: Vec<&str> = exp.split_whitespace().collect();
+        for elt in split_exp{
+            if self.operator_list.contains(&elt){
+                let right = stack.pop().unwrap();
+                let left = stack.pop().unwrap();
+                if self.compare_to_valid_element(left, elt, right){
+                    stack.push("1");
+                }else{
+                    stack.push("0");
+                }
+            }else{
+                stack.push(elt);
+            }
+        }
+        return stack[0] == "1";
     }
 
     fn compare_to_valid_element(&self, left_s: &str, operator: &str, right_s: &str) -> bool{
@@ -98,33 +149,9 @@ impl TypeGestion{
             "<" => return left < right,
             ">=" => return left >= right,
             "<=" => return left <= right,
+            "AND" => return left == 1.0 && right == 1.0,
+            "OR" => return left == 1.0 || right == 1.0,
             _ => return false
         }
     }
-
-
-    pub fn convert_a_full_line(&self, line: &str) -> String{
-        let mut splited_line: Vec<&str> = line.split_whitespace().collect();
-        let mut s = splited_line.len();
-        let mut i = 0;
-        while i<s{
-            if splited_line[i] == "("{
-                let result = self.compare_to_valid_element(splited_line[i+1], splited_line[i+2], splited_line[i+3]);
-                for _ in 0..5{
-                    splited_line.remove(i);
-                }
-                if result{
-                    splited_line.insert(i, "true");
-                }else{
-                    splited_line.insert(i, "false");
-                }
-                
-                s -= 4;
-            }
-            i += 1;
-        }
-        return splited_line.join(" ")
-    }
-
-    
 }
