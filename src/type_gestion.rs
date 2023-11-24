@@ -125,4 +125,6 @@ impl TypeGestion{
         }
         return splited_line.join(" ")
     }
+
+    
 }
