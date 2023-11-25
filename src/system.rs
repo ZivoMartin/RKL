@@ -1,8 +1,6 @@
 use crate::text_file::TextFile;
 use crate::text_file::file_exists;
 use crate::type_gestion::TypeGestion;
-use std::str::FromStr;
-use std::any::type_name;
 use std::collections::HashMap;
 
 pub struct System{
@@ -33,15 +31,36 @@ impl System{
         }
     }
 
-    fn delete_line_if(&mut self, arg: HashMap::<&str, &str>){
+    fn delete_line_if(&mut self, mut arg: HashMap::<&str, &str>){
         let table_name = arg.remove(":table_name").unwrap();
         let condition = arg.remove(":condition").unwrap();
+        let mut string_hashmap = HashMap::<String, String>::new();
         if self.table_exist(table_name){
-            let mut table_file = TextFile::new(&format!("text_files/{}", tab_name));
-            let text = table_file.get_text();
+            let mut table_file = TextFile::new(format!("text_files/{}", table_name));
+            let mut data_file = TextFile::new(format!("text_files/data_{}", table_name));
+            let mut text = table_file.get_text();
+            text.pop();
+            let mut data_text = data_file.get_text();
+            data_text.pop();
+            let data_text_splited: Vec<&str> = data_text.split("\n").collect();
+            let keys: Vec::<&str> = arg.keys().cloned().collect();
             for p_key in text.split("\n"){
-                let line_file = TextFile::new(format!("text_files/{}_line_{}", tab_name, p_key));
-                let bool_string_for_this_line = self.build_bool_string(condition.clone(), line_file, &arg);
+                let mut line_file = TextFile::new(format!("text_files/{}_line_{}", table_name, p_key));
+                let line_file_text = line_file.get_text();
+                let line_text_split: Vec::<&str> = line_file_text.split("\n").collect();
+                for i in 0..data_text_splited.len(){
+                    let split_space: Vec<&str> = data_text_splited[i].split_whitespace().collect();
+                    if keys.contains(&split_space[0]){
+                        let mut arg_data = self.get_good_data(line_text_split[i].to_string());
+                        if split_space[1].starts_with("VARCHAR"){
+                            arg_data = format!("{}", self.type_gestion.hash_string_to_number(arg_data));
+                        }else if split_space[1] == "BOOL"{
+                            arg_data = self.type_gestion.convert_bool_to_number(&arg_data);
+                        }
+                        string_hashmap.insert(String::from(split_space[0]), arg_data);
+                    }
+                }
+                let bool_string_for_this_line = self.build_bool_string(condition.clone().to_string(), &string_hashmap);
                 if self.type_gestion.descript_a_string_bool(&bool_string_for_this_line){
                     self.delete_line(&table_name, &p_key);
                 }
@@ -51,11 +70,15 @@ impl System{
         }
     }
 
-    fn build_bool_string(&self, line_file: TextFile, bool_string: String, &arg: HashMap::<&str, &str>) -> String{
-        let mut result = String::from();
-        let keys: Vec::<&str> = argmy_map.keys().cloned().collect();
-        let text = line_file.get_text();
-        
+    fn build_bool_string(&self, bool_string: String, arg: &HashMap::<String, String>) -> String{
+        let keys: Vec::<String> = arg.keys().cloned().collect();
+        let mut split: Vec::<&str> = bool_string.split_whitespace().collect();
+        for i in 0..split.len(){
+            if keys.contains(&split[i].to_string()){
+                split[i] = &arg[split[i]];
+            }
+        }  
+        split.join(" ")
     }
 
     fn create_table(&mut self, mut arg: HashMap<&str, &str>) {
@@ -68,18 +91,15 @@ impl System{
             TextFile::new(new_table_path);
             let mut new_table_data_file = TextFile::new(new_table_data_path);
             let primary_key = arg.remove(":primary").unwrap();
-            new_table_data_file.push(&format!("{} {}\n", primary_key, arg.remove(primary_key).unwrap()));
+            let mut data_text = format!("{} {}\n", primary_key, arg.remove(primary_key).unwrap());
             for (var_name, type_var) in &arg{
                 if !var_name.starts_with("$") && !var_name.starts_with(":"){
                     let split_type: Vec::<&str> = type_var.split_whitespace().collect();
                     match split_type.len(){
-                        1 => new_table_data_file.push(&format!("{} {}\n", &var_name, split_type[0])),
+                        1 => data_text += &format!("{} {}\n", &var_name, split_type[0]),
                         2 => {
                             match split_type[1]{
-                                "DEFAULT" => {
-                                    let content = format!("{} {} DEFAULT {}\n", var_name, split_type[0], arg[&format!("${}", &var_name) as &str]);
-                                    new_table_data_file.push(&content);
-                                },
+                                "DEFAULT" => data_text += &format!("{} {} DEFAULT {}\n", var_name, split_type[0], arg[&format!("${}", &var_name) as &str]),
                                 _ => println!("To many arguments")
                             }
                         },
@@ -87,6 +107,7 @@ impl System{
                     }
                 }
             }
+            new_table_data_file.push(&data_text);
         }
     }
 
@@ -151,7 +172,9 @@ impl System{
                         }
                     }
                     if arg_correct && !file_exists(&line_file_name){
-                        tab_file.push(&p_key_val);
+                        let mut p_key_val_s = p_key_val.to_string();
+                        p_key_val_s.push_str("\n");
+                        tab_file.push(&p_key_val_s);
                         let mut line_file = TextFile::new(line_file_name);
                         line_file.push(&line_text);
                     }
@@ -164,9 +187,6 @@ impl System{
         }
     }
 
-    // fn get_element_from(&mut self, arg: Vec<&str>) -> Vec::<Vec::<String>>{
-        
-    // }
     
     fn get_primary_key(&self, table_name: &str) -> String{
         TextFile::new(format!("text_files/data_{}", table_name)).get_text().split("\n").nth(0).unwrap().split_whitespace().nth(0).unwrap().to_string()
@@ -261,80 +281,3 @@ fn get_nb_line_file(file: &mut TextFile) -> i32 {
 }
 
 
-
-
-
-// fn descript_a_string_bool(bool_string : String, s: i32, e: i32) -> String{
-//     vect = bool_string.split_whitespace.collect();
-//     for i in s..e{
-//         if vect[i].starts_with('('){
-//             if vect[i+2].ends_with(')'){
-//                 vect[i].remove(0);
-//                 vect[i+2].remove(vect[i+2].len()-1);
-                
-//                 if compare_to_valid_element
-//             }
-//         }
-//     }
-// }
-
-
-#[allow(dead_code)]
-
-
-#[allow(dead_code)]
-fn convert_with_good_type<T>(value: &str) -> T where T: FromStr + Default, {
-    match type_name::<T>() {
-        "bool" => match value {
-            "true" => "1".parse().unwrap_or_default(),
-            _ => "0".parse().unwrap_or_default(),
-        },
-        "std::string::String" => value.parse().unwrap_or_default(),
-        _ => String::from(value).parse().unwrap_or_default(),
-    }
-}
-
-
-    // fn delete_line_if<F>(
-    //     &mut self,
-    //     mut arg: Vec<&str>,
-    //     closure: F,
-    // ) 
-    // where
-    //     F: Fn(Vec<i32>, Vec<String>, Vec<bool>, Vec<f32>) -> bool,
-    // {
-    //     let table_name = arg[0];
-    //     arg.remove(0);
-    //     if self.table_exist(table_name){
-    //         let mut tab_file = TextFile::new(format!("text_files/{}", table_name));
-    //         let mut data_file = TextFile::new(format!("text_files/data_{}", table_name));
-    //         let text = tab_file.get_text();
-    //         let mut arg_data_vect: Vec<(i32, &str)> = Vec::new();
-    //         for param in arg{
-    //             arg_data_vect.push(self.get_arg_data(&mut data_file, param));
-    //         }
-    //         for line in text.lines(){
-    //             let mut line_file = TextFile::new(format!("text_files/{}_line_{}", table_name, line));
-    //             let line_text = line_file.get_text();
-    //             let mut bool_tab : Vec<bool> = Vec::new();
-    //             let mut string_tab : Vec<String> = Vec::new();
-    //             let mut float_tab : Vec<f32> = Vec::new();
-    //             let mut int_tab : Vec<i32> = Vec::new();
-    //             for data in &arg_data_vect{
-    //                 let the_arg = self.type_gestion.get_good_data(line_text.split("\n").nth(data.0 as usize).unwrap().to_string());
-    //                 match data.1{
-    //                     "INT" => int_tab.push(self.type_gestion.convert_with_good_type::<i32>(data.1, &the_arg)),
-    //                     "FLOAT" => float_tab.push(self.type_gestion.convert_with_good_type::<f32>(data.1, &the_arg)),
-    //                     "BOOL" => match self.type_gestion.convert_with_good_type::<i32>(data.1, &the_arg){
-    //                         1 => bool_tab.push(true),
-    //                         _ => bool_tab.push(false)
-    //                     },
-    //                     _ => string_tab.push(self.type_gestion.convert_with_good_type::<String>(data.1, &the_arg))
-    //                 }
-    //             }
-    //             if closure(int_tab, string_tab, bool_tab, float_tab){
-    //                 self.clear_line_file(line_file);
-    //             }
-    //         }
-    //     }
-    // }

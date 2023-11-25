@@ -105,7 +105,6 @@ impl TypeGestion{
             result.push_str(&format!(" {}", stack.pop().unwrap()));
         }
         result.remove(0);
-        println!("{}", result);
         result
     }
 
@@ -152,6 +151,22 @@ impl TypeGestion{
             "AND" => return left == 1.0 && right == 1.0,
             "OR" => return left == 1.0 || right == 1.0,
             _ => return false
+        }
+    }
+
+    pub fn hash_string_to_number(&self, string: String)->i32{
+        let mut result: i32 = 0;
+        for chara in string.chars(){
+            result += chara as i32;
+        }
+        result
+    }
+
+
+    pub fn convert_bool_to_number(&self, string: &str) -> String{
+        match string{
+            "true" => return String::from("1"),
+            _ => return String::from("0")
         }
     }
 }

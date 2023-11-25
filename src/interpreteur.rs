@@ -74,23 +74,22 @@ impl Interpreteur {
                 let mut arguments = HashMap::<String, String>::new();
                 let mut result = HashMap::<&str, &str>::new();
                 arguments.insert(String::from(":table_name"), table_name.to_string());
-                arguments.insert(String::from(":type_request"), String::from("DELETE_LINE_IF"));
+                arguments.insert(String::from(":request"), String::from("DELETE_LINE_IF"));
                 if vect_req.len() == 0{
                     arguments.insert(String::from(":condition"), String::from("1 == 1"));
                     self.convert_in_str_hashmap(&arguments, &mut result);
-                    //self.system.new_request(result);
+                    self.system.new_request(result);
                 }else{
                     let key_word = vect_req.remove(0); 
                     match key_word{
                         "WHERE" => {
                             let condition = vect_req.join(" ");
-                            let cleaning = self.clean_the_condition(condition);
+                            let cleaning = self.clean_the_condition(condition, &mut arguments);
                             match cleaning{
                                 Some(condition) => {
-                                    println!("{}", condition);
                                     arguments.insert(String::from(":condition"), condition);
                                     self.convert_in_str_hashmap(&arguments, &mut result);
-                                    //self.system.new_request(result);
+                                    self.system.new_request(result);
                                 }
                                 None => println!("The condition is incorrect.")
                             }
@@ -108,54 +107,69 @@ impl Interpreteur {
         }
     }
 
-    fn clean_the_condition(&self, mut cond: String, &arg, HashMap::<String, String>) -> Option<String>{
-        let _ = cond.replace("  ", " ");
-        let cloned_cond_or = cond.clone();
-        let split_or: Vec<&str> = cloned_cond_or.split("OR").collect();
-        let mut i = 0;
-        for elt in &split_or{
-            if elt.to_string() == "".to_string() || (elt.chars().next().unwrap() != ' ' && i != 0) || (elt.chars().rev().next().unwrap() != ' ' && i != split_or.len()-1){
-                return None;
-            }
-            i += 1;
-        }
-        cond = split_or.join("OR");
-        let cloned_cond_and = cond.clone();
-        let split_and: Vec<&str> = cloned_cond_and.split("AND").collect();
-        i = 0;
-        for elt in &split_and{
-            if elt.to_string() == String::from("") || (elt.chars().next().unwrap() != ' ' && i != 0) || (elt.chars().rev().next().unwrap() != ' ' && i != split_and.len()-1){
-                return None;
-            }
-            i += 1;
-        }
-        cond = split_and.join("AND");
-        for i in 0..6{
-            let mut split: Vec::<String> = cond.split(self.type_gestion.get_nth_operator(i)).map(String::from).collect();
-            let mut j = 0;
-            for i in 0..split.len(){
-                if split[i] == String::from(""){
+    fn replace_the_space(&self, cond: String, operator: &str, ok_to_replace: bool) -> Option<String>{
+        let mut split: Vec::<String> = cond.split(operator).map(String::from).collect();
+        for i in 0..split.len(){
+            if i != 0 && split[i].chars().next() != Some(' '){
+                if !ok_to_replace{
                     return None;
                 }
-                if split[i].chars().next().unwrap() != ' ' && j != 0{
-                    split[i] = String::from(" ") + &split[i];
-                } 
-                if split[i].chars().rev().next() != Some(' ') && j != split_and.len().try_into().unwrap(){
-                    split[i] += " ";
+                split[i] = String::from(" ") + &split[i];
+            } 
+            if i != split.len()-1 && split[i].chars().rev().next() != Some(' '){
+                if !ok_to_replace{
+                    return None;
                 }
-                j+=1;
+                split[i] += " ";
             }
-            cond = split.join(self.type_gestion.get_nth_operator(i));
         }
+        Some(split.join(operator))
+    }
+
+    fn clean_the_condition(&self, mut cond: String, arg: &mut HashMap::<String, String>) -> Option<String>{
+        let _ = cond.replace("  ", " ");
+
+        match self.replace_the_space(cond, "AND", false){
+            Some(new_cond) => cond = new_cond,
+            None => return None
+        }
+
+        match self.replace_the_space(cond, "OR", false){
+            Some(new_cond) => cond = new_cond,
+            None => return None
+        }
+
+        for i in 0..7{
+            cond = self.replace_the_space(cond, self.type_gestion.get_nth_operator(i), true).unwrap();
+        }
+        cond = self.replace_the_space(cond, ")", true).unwrap();
+
         let mut space_split: Vec<String> = cond.split_whitespace().map(String::from).collect();
         let mut i = 0;
+        let n = space_split.len() - 1;
+        let mut opening = 0;
+        let mut ending = 0;
+        let par = String::from("()");
         while i<space_split.len(){
-            if self.type_gestion.operator_exist(&space_split[i]){
-                if self.type_gestion.operator_exist(&space_split[i-1]) || self.type_gestion.operator_exist(&space_split[i+1]){
+            if self.type_gestion.operator_exist(&space_split[i]) && space_split[i] != "("{
+                if i == 0 || i == n || (self.type_gestion.operator_exist(&space_split[i-1]) && space_split[i-1] != "(") || (self.type_gestion.operator_exist(&space_split[i+1]) && space_split[i+1] != "("){
                     return None;
                 }  
+            }else if space_split[i] == "("{
+                opening += 1;
+                if (i == n || (i != 0 && !self.type_gestion.operator_exist(&space_split[i-1])) && !par.contains(&space_split[i-1])) || (self.type_gestion.operator_exist(&space_split[i+1]) && !par.contains(&space_split[i+1])){
+                    println!("1");
+                    return None;
+                }
+            }else if space_split[i] == ")"{
+                ending += 1;
+                if ending > opening || (self.type_gestion.operator_exist(&space_split[i-1]) && !par.contains(&space_split[i-1])) || (i != n && (!self.type_gestion.operator_exist(&space_split[i+1]) && !par.contains(&space_split[i+1]))){
+                    println!("2");
+                    return None;
+                }
             }else{
-                if (i != 0 && !self.type_gestion.operator_exist(&space_split[i-1])) || (i != space_split.len()-1 && !self.type_gestion.operator_exist(&space_split[i+1]) && space_split[i].to_string().chars().next().unwrap() != '\''){
+                if (i != 0 && !self.type_gestion.operator_exist(&space_split[i-1])) || (i != n && !self.type_gestion.operator_exist(&space_split[i+1]) && space_split[i+1] != ")" && space_split[i].to_string().chars().next().unwrap() != '\''){
+                    println!("{}", space_split[i]);
                     return None;
                 } 
                 if !self.type_gestion.is_float(&space_split[i]){
@@ -170,17 +184,20 @@ impl Interpreteur {
                             the_string += &space_split.remove(i);
                         }
                         if the_string.pop() != Some('\''){
+                            println!("4");
                             return None;
                         }
-                        space_split.insert(i, format!("{}", self.hash_string_to_number(the_string)));
+                        space_split.insert(i, format!("{}", self.type_gestion.hash_string_to_number(the_string)));
                     }else{
                         if space_split[i].contains("."){
                             let p_split: Vec::<&str> = space_split[i].split(".").collect();
                             if p_split.len() != 2 || !self.is_correct_name(p_split[0]) || !self.is_correct_name(p_split[1]){
+                                println!("5");
                                 return None;
                             }
                             arg.insert(p_split[1].to_string(), p_split[0].to_string());
                         }else if !self.is_correct_name(&space_split[i]){
+                            println!("{}", space_split[i]);
                             return None;
                         }else{
                             arg.insert(space_split[i].to_string(), String::from(""));
@@ -190,18 +207,14 @@ impl Interpreteur {
             }
             i += 1;
         }
+        if ending != opening{
+            return None;
+        }
         Some(space_split.join(" "))
     }   
 
 
-    fn hash_string_to_number(&self, string: String)->i32{
-        let mut result: i32 = 0;
-        for chara in string.chars(){
-            result += chara as i32;
-        }
-        result
-    }
-
+    
     fn insert_request(&mut self, mut vect_req: Vec::<&str>){
         let mut arguments = HashMap::<String, String>::new();
         let mut result = HashMap::<&str, &str>::new();
