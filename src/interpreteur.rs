@@ -39,6 +39,9 @@ impl Interpreteur {
                 "DELETE" => {
                     self.delete_line(vect_req);
                 }
+                "SELECT" => {
+                    self.select_request(vect_req);
+                }
                 _ => {
                     println!("{} is unnknow by the system.", vect_req[0]);
                 }
@@ -66,6 +69,26 @@ impl Interpreteur {
             println!("DROP {} n'est pas une commande valide", vect_req.join(" "));
         }
     }
+
+
+
+    fn select_request(&mut self, arg: Vec<&str>){
+        if arg.len() >= 3 {
+            arguments = HashMap::<String, String>::new();
+            arguments.insert(String::from(":request"), String::from("select"));
+            match arg[0]{
+                "*" => {
+                    arguments.insert(String::from(":all"), String::from("1"));
+                }
+                _ => {
+                    arguments.insert(String::from(":all"), String::from("0"));
+                }
+            }
+        }else{
+            println!("Invalid request.");
+        }
+    }
+
 
     fn delete_line(&mut self, mut vect_req: Vec::<&str>){
         if vect_req.len() >= 2 && vect_req.remove(0) == "FROM"{

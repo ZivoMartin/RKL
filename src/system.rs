@@ -5,7 +5,6 @@ use std::collections::HashMap;
 
 pub struct System{
     main_file: TextFile,
-    nb_table: i32,
     type_gestion: TypeGestion
 }
 
@@ -14,9 +13,7 @@ pub struct System{
 impl System{
 
     pub fn new() -> System{
-        let mut main_file = TextFile::new(String::from("text_files/main_file.txt"));
-        let nb_line = get_nb_line_file(&mut main_file);
-        System{main_file: main_file, nb_table: nb_line, type_gestion: TypeGestion::new()}
+        System{main_file: TextFile::new(String::from("text_files/main_file.txt")), type_gestion: TypeGestion::new()}
     }
 
     pub fn new_request(&mut self, mut arg: HashMap<&str, &str>){  
@@ -26,12 +23,26 @@ impl System{
             "INSERT" => self.insert_line(arg),
             "DELETE_LINE" => self.delete_line(arg[":table_name"], arg[":primary"]),
             "DELETE_TABLE" => self.delete_table(arg[":table_name"]),
-            "DELETE_LINE_IF" => self.delete_line_if(arg),
+            "DELETE_LINE_IF" => {
+                let closure = |table_name: &str, primary_key: &str| {
+                    self.delete_line(table_name, primary_key);
+                };
+                self.browse_lines(arg, closure);
+            },
             _ => println!("La commande {} n'a pas encore été configurée..", type_request)
         }
     }
 
-    fn delete_line_if(&mut self, mut arg: HashMap::<&str, &str>){
+    
+
+
+    fn browse_lines<F>(
+        &mut self,
+        mut arg: HashMap::<&str, &str>,
+        mut f: F)
+    where
+        F: FnMut(&str, &str),
+    {
         let table_name = arg.remove(":table_name").unwrap();
         let condition = arg.remove(":condition").unwrap();
         let mut string_hashmap = HashMap::<String, String>::new();
@@ -60,15 +71,16 @@ impl System{
                         string_hashmap.insert(String::from(split_space[0]), arg_data);
                     }
                 }
-                let bool_string_for_this_line = self.build_bool_string(condition.clone().to_string(), &string_hashmap);
+                let bool_string_for_this_line = self.build_bool_string(condition.to_string(), &string_hashmap);
                 if self.type_gestion.descript_a_string_bool(&bool_string_for_this_line){
-                    self.delete_line(&table_name, &p_key);
+                    f(&table_name, &p_key);
                 }
             }
-        }else{
+        }else{  
             println!("The table {} don't exist", table_name);
         }
     }
+
 
     fn build_bool_string(&self, bool_string: String, arg: &HashMap::<String, String>) -> String{
         let keys: Vec::<String> = arg.keys().cloned().collect();
@@ -86,7 +98,6 @@ impl System{
         let new_table_path = format!("text_files/{}", new_table_name);
         let new_table_data_path = format!("text_files/data_{}", new_table_name);
         if !self.table_exist(new_table_name){
-            self.nb_table += 1;
             self.main_file.push(&format!("{}\n", new_table_name));
             TextFile::new(new_table_path);
             let mut new_table_data_file = TextFile::new(new_table_data_path);
@@ -274,10 +285,6 @@ impl System{
             println!("La table {} n'existe pas.", table_name);
         }
     }
-}
-
-fn get_nb_line_file(file: &mut TextFile) -> i32 {
-    (file.get_text().split('\n').count() - 1) as i32
 }
 
 
