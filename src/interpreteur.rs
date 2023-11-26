@@ -73,8 +73,12 @@ impl Interpreteur {
 
 
 
-    fn select_request(&mut self, mut arg: Vec<&str>) -> Option<HashMap<String, Vec<String>>>{
-        if arg.len() >= 3 {
+    fn select_request(&mut self, vect_req: Vec<&str>) -> Option<HashMap<String, Vec<String>>>{
+        if vect_req.len() >= 3 {
+            let mut tmp = vect_req.join(" ");
+            tmp = tmp.replace(" ,", ",");
+            tmp = tmp.replace(", ", ",");
+            let mut arg: Vec::<&str> = tmp.split_whitespace().collect();
             let mut arguments = HashMap::<String, String>::new();
             let mut result = HashMap::<&str, &str>::new();
             arguments.insert(String::from(":request"), String::from("SELECT"));
@@ -85,9 +89,12 @@ impl Interpreteur {
                 }
                 _ => {
                     let mut asked = String::new();
-                    while arg.len() != 0 && self.is_correct_name(arg[0]) && arg[0] != "FROM"{
-                        asked += arg.remove(0);
+                    let ask_tab: Vec<&str> = arg.remove(0).split(",").collect();
+                    let mut i = 0;
+                    while i<ask_tab.len() && self.is_correct_name(ask_tab[i]){
+                        asked += ask_tab[i];
                         asked += "/";
+                        i += 1;
                     } 
                     if asked.len() == 0{
                         println!("You selected nothing");

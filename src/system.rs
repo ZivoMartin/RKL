@@ -48,12 +48,23 @@ impl System{
             let mut data_file = TextFile::new(format!("text_files/data_{}", table_name));
             let mut asked_hash_map = HashMap::<String, i32>::new();  
             let asked_string = arg.remove(":asked").unwrap();
-            if asked_string != String::from(""){
+            if asked_string == String::from("*"){
+                let txt_data = data_file.get_text();
+                let split = txt_data.split("\n");
+                let mut i = 0;
+                for elt in split{
+                    if elt != ""{
+                        let column = String::from(elt.split_whitespace().nth(0).unwrap());
+                        asked_hash_map.insert(column.clone(), i);
+                        result.insert(column, Vec::<String>::new());
+                    }
+                    i += 1;
+                }
+            }else if asked_string != String::from(""){
                 let asked_string_split = asked_string.split("/");
                 for ask in asked_string_split{
                     match self.get_arg_data(&mut data_file, &ask){
                         Some(res) => {
-                            println!("{:?}", res);
                             asked_hash_map.insert(ask.to_string(), res.0);
                             result.insert(ask.to_string(), Vec::<String>::new());
                         }
@@ -154,7 +165,7 @@ impl System{
                     let line_file_name = format!("text_files/{}_line_{}", name, p_key_val);
                     let mut arg_correct = true;
                     let text = data_file.get_text();
-                    let mut line_text = format!("{}\n", p_key_val);
+                    let mut line_text = format!("d{}\n", p_key_val);
                     for line in text.lines().skip(1) {
                         let mut splited_line = line.split_whitespace();
                         let data_name = splited_line.nth(0).unwrap();

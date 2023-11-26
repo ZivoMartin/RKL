@@ -15,7 +15,7 @@ fn main() {
     interpreteur.sqlrequest(String::from("INSERT INTO Humain (id, name, age) VALUES (3, 'Raghid', 17);"));
     interpreteur.sqlrequest(String::from("INSERT INTO Humain (id, name, age) VALUES (4, 'Dabi', 18);"));
     interpreteur.sqlrequest(String::from("INSERT INTO Humain (id, name, age) VALUES (5, 'Vico', 18);"));
-    let res = interpreteur.sqlrequest(String::from("SELECT vivant age id FROM Humain WHERE age>18;"));
-    println!("{:?}", res);
+    let res = interpreteur.sqlrequest(String::from("SELECT ageid ,vivant FROM Humain WHERE age>18;"));
+    println!("{:?}", res); 
     interpreteur.sqlrequest(String::from("DELETE FROM Humain WHERE (2!=5 AND 8>7) AND age<19;"));
 }
