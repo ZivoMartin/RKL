@@ -18,7 +18,7 @@ impl Interpreteur {
         }
     }
 
-    pub fn sqlrequest(&mut self, mut req: String){
+    pub fn sqlrequest(&mut self, mut req: String) -> Option<HashMap<String, Vec<String>>>{
         if req != "" && req.pop() == Some(';') && !req.contains("  "){
             let mut vect_req: Vec<&str> = req.split(" ").collect();
             let type_request = vect_req.remove(0);
@@ -40,7 +40,7 @@ impl Interpreteur {
                     self.delete_line(vect_req);
                 }
                 "SELECT" => {
-                    self.select_request(vect_req);
+                    return self.select_request(vect_req);
                 }
                 _ => {
                     println!("{} is unnknow by the system.", vect_req[0]);
@@ -49,6 +49,7 @@ impl Interpreteur {
         }else if req.pop() == Some(';') || !req.contains("  "){
             println!("Votre requête ne respecte pas les regles de syntaxe");
         }
+        None
     }
 
     fn drop_req(&mut self, vect_req: Vec::<&str>){
@@ -72,21 +73,74 @@ impl Interpreteur {
 
 
 
-    fn select_request(&mut self, arg: Vec<&str>){
+    fn select_request(&mut self, mut arg: Vec<&str>) -> Option<HashMap<String, Vec<String>>>{
         if arg.len() >= 3 {
-            arguments = HashMap::<String, String>::new();
-            arguments.insert(String::from(":request"), String::from("select"));
+            let mut arguments = HashMap::<String, String>::new();
+            let mut result = HashMap::<&str, &str>::new();
+            arguments.insert(String::from(":request"), String::from("SELECT"));
+            arguments.insert(String::from(":asked"), String::from("*"));
             match arg[0]{
                 "*" => {
-                    arguments.insert(String::from(":all"), String::from("1"));
+                    arg.remove(0);
                 }
                 _ => {
-                    arguments.insert(String::from(":all"), String::from("0"));
+                    let mut asked = String::new();
+                    while arg.len() != 0 && self.is_correct_name(arg[0]) && arg[0] != "FROM"{
+                        asked += arg.remove(0);
+                        asked += "/";
+                    } 
+                    if asked.len() == 0{
+                        println!("You selected nothing");
+                    }else{
+                        asked.pop();
+                    }
+                    arguments.insert(String::from(":asked"), asked);
                 }
+            }
+            if arg.len() > 0{
+                match arg.remove(0){
+                    "FROM" => {
+                        let table_name = arg.remove(0);
+                        if self.is_correct_name(table_name){
+                            arguments.insert(String::from(":table_name"), table_name.to_string());
+                            if arg.len() > 0{
+                                match arg.remove(0){
+                                    "WHERE" => {
+                                        if arg.len() == 0{
+                                            println!("Condition missing");
+                                        }else{
+                                            let condition = arg.join(" ");
+                                            let cleaning = self.clean_the_condition(condition, &mut arguments);
+                                            match cleaning{
+                                                Some(condition) => {
+                                                    arguments.insert(String::from(":condition"), condition);
+                                                    self.convert_in_str_hashmap(&arguments, &mut result);
+                                                    return self.system.new_request(result);
+                                                }
+                                                None => println!("The condition is incorrect.")
+                                            }
+                                        }
+                                    }
+                                    _ => println!("Bad keyword")
+                                }
+                            }else{
+                                arguments.insert(String::from(":condition"), String::from("1 == 1"));
+                                self.convert_in_str_hashmap(&arguments, &mut result);
+                                return self.system.new_request(result);
+                            }
+                        }else{
+                            println!("{} is not a correct name for a table.", table_name);
+                        }
+                    },   
+                    _ => println!("Bad syntax in the select request.")
+                }
+            }else{
+                println!("FROM is missing.");
             }
         }else{
             println!("Invalid request.");
         }
+        None
     }
 
 
@@ -106,15 +160,19 @@ impl Interpreteur {
                     let key_word = vect_req.remove(0); 
                     match key_word{
                         "WHERE" => {
-                            let condition = vect_req.join(" ");
-                            let cleaning = self.clean_the_condition(condition, &mut arguments);
-                            match cleaning{
-                                Some(condition) => {
-                                    arguments.insert(String::from(":condition"), condition);
-                                    self.convert_in_str_hashmap(&arguments, &mut result);
-                                    self.system.new_request(result);
+                            if vect_req.len() == 0{
+                                println!("Condition missing");
+                            }else{
+                                let condition = vect_req.join(" ");
+                                let cleaning = self.clean_the_condition(condition, &mut arguments);
+                                match cleaning{
+                                    Some(condition) => {
+                                        arguments.insert(String::from(":condition"), condition);
+                                        self.convert_in_str_hashmap(&arguments, &mut result);
+                                        self.system.new_request(result);
+                                    }
+                                    None => println!("The condition is incorrect.")
                                 }
-                                None => println!("The condition is incorrect.")
                             }
                         }   
                         _ => {
