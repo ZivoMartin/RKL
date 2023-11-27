@@ -16,29 +16,54 @@ impl System{
         System{main_file: TextFile::new(String::from("text_files/main_file.txt")), type_gestion: TypeGestion::new()}
     }
 
-    pub fn new_request<'a>(&'a mut self, mut arg: HashMap<&str, &'a str>) -> Option<HashMap<String, Vec<String>>>{  
+    pub fn new_request<'a>(&'a mut self, mut arg: HashMap<&str, &'a str>) -> Result<Option<HashMap<String, Vec<String>>>, String>{  
         let type_request = arg.remove(":request").unwrap();
         match type_request{
-            "CREATE" => self.create_table(arg),
-            "INSERT" => self.insert_line(arg),
-            "DELETE_LINE" => self.delete_line(arg[":table_name"], arg[":primary"]),
-            "DELETE_TABLE" => self.delete_table(arg[":table_name"]),
+            "CREATE" => {
+                match self.create_table(arg){
+                    Ok(_) => return Ok(None),
+                    Err(e) => return Err(e.to_string())
+                }
+            }
+            "INSERT" => {
+                match self.insert_line(arg){
+                    Ok(_) => return Ok(None),
+                    Err(e) => return Err(e.to_string())
+                }
+            }
+            "DELETE_LINE" => {
+                match self.delete_line(arg[":table_name"], arg[":primary"]){
+                    Ok(_) => return Ok(None),
+                    Err(e) => return Err(e.to_string())
+                }
+            }
+            "DELETE_TABLE" => {
+                match self.delete_table(arg[":table_name"]){
+                    Ok(_) => return Ok(None),
+                    Err(e) => return Err(e.to_string())
+                }
+            }
             "DELETE_LINE_IF" => {
                 arg.insert(":asked", "");
-                self.browse_lines(arg, "delete");
-            },
-            "SELECT" => {
-                return self.browse_lines(arg, "select");
+                match self.browse_lines(arg, "delete"){
+                    Ok(_) => return Ok(None),
+                    Err(e) => return Err(e.to_string())
+                }
             }
-            _ => println!("La commande {} n'a pas encore été configurée..", type_request)
+            "SELECT" => {
+                match self.browse_lines(arg, "select"){
+                    Ok(res) => return Ok(Some(res)),
+                    Err(e) => return Err(e.to_string())
+                }
+            }
+            _ => return Err(format!("La commande {} n'a pas encore été configurée..", type_request))
         }
-        return None;
     }
 
     
 
 
-    fn browse_lines<'a>(&'a mut self, mut arg: HashMap::<&str, &'a str>, id: &str) -> Option<HashMap<String, Vec<String>>>{
+    fn browse_lines<'a>(&'a mut self, mut arg: HashMap::<&str, &'a str>, id: &str) -> Result<HashMap<String, Vec<String>>, String>{
         let table_name = arg.remove(":table_name").unwrap();
         let condition = arg.remove(":condition").unwrap();
         let mut string_hashmap = HashMap::<String, String>::new();
@@ -68,7 +93,7 @@ impl System{
                             asked_hash_map.insert(ask.to_string(), res.0);
                             result.insert(ask.to_string(), Vec::<String>::new());
                         }
-                        None => return None
+                        None => return Err(format!("La colonne {} n'existe pas pour la table {}", ask, table_name))
                     }
                 }
             }
@@ -97,7 +122,7 @@ impl System{
                 let bool_string_for_this_line = self.build_bool_string(condition.to_string(), &string_hashmap);
                 if self.type_gestion.descript_a_string_bool(&bool_string_for_this_line){
                     if id == "delete"{
-                        self.delete_line(&table_name, &p_key);
+                        let _ = self.delete_line(&table_name, &p_key);
                     }else if id == "select"{
                         for (key, value) in &asked_hash_map{
                             result.get_mut(key).unwrap().push(self.get_good_data(line_text_split[*value as usize].to_string()));
@@ -105,10 +130,9 @@ impl System{
                     }
                 }
             }
-            return Some(result);
+            return Ok(result);
         }else{  
-            println!("The table {} don't exist", table_name);
-            None
+            return Err(format!("The table {} don't exist", table_name));
         }
     }
 
@@ -124,7 +148,7 @@ impl System{
         split.join(" ")
     }
 
-    fn create_table(&mut self, mut arg: HashMap<&str, &str>) {
+    fn create_table(&mut self, mut arg: HashMap<&str, &str>) -> Result<(), String>{
         let new_table_name = arg.remove(":table_name").unwrap();
         let new_table_path = format!("text_files/{}", new_table_name);
         let new_table_data_path = format!("text_files/data_{}", new_table_name);
@@ -142,18 +166,21 @@ impl System{
                         2 => {
                             match split_type[1]{
                                 "DEFAULT" => data_text += &format!("{} {} DEFAULT {}\n", var_name, split_type[0], arg[&format!("${}", &var_name) as &str]),
-                                _ => println!("To many arguments")
+                                _ => return Err(String::from("To many arguments"))
                             }
                         },
-                        _ => println!("To many arguments")
+                        _ => return Err(String::from("To many arguments"))
                     }
                 }
             }
             new_table_data_file.push(&data_text);
+            return Ok(());
+        }else {
+            return Err(format!("The table {} already exist.", new_table_name))
         }
     }
 
-    fn insert_line(&mut self, mut arg: HashMap<&str, &str>) {
+    fn insert_line(&mut self, mut arg: HashMap<&str, &str>) -> Result<(), String>{
         let name = arg.remove(":table_name").unwrap();
         if self.table_exist(name){
             let mut tab_file = TextFile::new(format!("text_files/{}", name));
@@ -163,7 +190,6 @@ impl System{
             match p_key_val_result{
                 Some(p_key_val) => {
                     let line_file_name = format!("text_files/{}_line_{}", name, p_key_val);
-                    let mut arg_correct = true;
                     let text = data_file.get_text();
                     let mut line_text = format!("d{}\n", p_key_val);
                     for line in text.lines().skip(1) {
@@ -182,15 +208,12 @@ impl System{
                                         match arg_in_request{
                                             Some(val) => {
                                                 if !self.type_gestion.good_type_and_good_value(&data_type, &val){
-                                                    arg_correct = false;
-                                                    break;
+                                                    return Err(format!("Le type de {} ne correspond pas au type attendu.", val))
                                                 } 
                                                 line_text = self.push_new_txt(line_text, val, &format!("{}_{}", line_file_name, data_name));
                                             },
                                             None =>  {
-                                                println!("La colonne {} ne peut pas etre nulle !", data_name);
-                                                arg_correct = false;
-                                                break;
+                                                return Err(format!("La colonne {} ne peut pas etre nulle !", data_name));
                                             }                               
                                         }   
                                     }_ =>{}
@@ -201,8 +224,7 @@ impl System{
                                 match arg_in_request{
                                     Some(val) => {
                                         if !self.type_gestion.good_type_and_good_value(&data_type, &val){
-                                            arg_correct = false;
-                                            break;
+                                            return Err(format!("Le type de {} ne correspond pas au type attendu.", val))
                                         }
                                         line_text = self.push_new_txt(line_text, val, &format!("{}_{}", line_file_name, data_name));
                                     }
@@ -213,19 +235,22 @@ impl System{
                             } 
                         }
                     }
-                    if arg_correct && !file_exists(&line_file_name){
+                    if !file_exists(&line_file_name){
                         let mut p_key_val_s = p_key_val.to_string();
                         p_key_val_s.push_str("\n");
                         tab_file.push(&p_key_val_s);
                         let mut line_file = TextFile::new(line_file_name);
                         line_file.push(&line_text);
+                        return Ok(());
+                    }else{
+                        return Err(format!("Il existe déjà une ligne avec pour clé primaire {}", p_key));
                     }
                 }None => {
-                    println!("Vous n'avez pas indiqué de clé primaire.");
+                    return Err(String::from("Vous n'avez pas indiqué de clé primaire."));
                 }
             }
         }else{
-            println!("La table {} n'éxiste pas.", name);
+            return Err(format!("La table {} n'éxiste pas.", name));
         }
     }
 
@@ -258,13 +283,16 @@ impl System{
 
     
 
-    fn delete_line(&mut self, table_name: &str, primary_key: &str){
+    fn delete_line(&mut self, table_name: &str, primary_key: &str) -> Result<(), String>{
         let line_file_path = format!("text_files/{}_line_{}", table_name, primary_key);
         if self.table_exist(table_name) && file_exists(&line_file_path){
             let mut table_file = TextFile::new(format!("text_files/{}", table_name));
             table_file.replace(&format!("{}\n", primary_key), "");                                                                                                                                                                                                                                                                                                      
             let line_file = TextFile::new(line_file_path);
             self.clear_line_file(line_file);
+            return Ok(())
+        }else{
+            return Err(format!("The table {} don't exist already", table_name))
         }
     }
 
@@ -302,18 +330,19 @@ impl System{
         return None;
     }   
 
-    fn delete_table(&mut self, table_name: &str){
+    fn delete_table(&mut self, table_name: &str) -> Result<(), String>{
         if self.table_exist(table_name){
             let mut tab_file = TextFile::new(format!("text_files/{}", table_name));
             let text = tab_file.get_text();
             for line in text.lines(){
-                self.delete_line(table_name, line);
+                let _ = self.delete_line(table_name, line);
             }
             tab_file.erase();
             TextFile::new(format!("text_files/data_{}", table_name)).erase();
             self.main_file.replace(&format!("{}\n", table_name), "");
+            return Ok(());
         }else{
-            println!("La table {} n'existe pas.", table_name);
+            return Err(format!("La table {} n'existe pas.", table_name));
         }
     }
 }
