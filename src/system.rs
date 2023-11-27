@@ -9,7 +9,7 @@ pub struct System{
 }
 
 
-#[allow(dead_code)]
+// #[allow(dead_code)]
 impl System{
 
     pub fn new() -> System{
@@ -56,7 +56,7 @@ impl System{
                     Err(e) => return Err(e.to_string())
                 }
             }
-            _ => return Err(format!("La commande {} n'a pas encore été configurée..", type_request))
+            _ => return Err(format!("The keyword {} isn't valid.", type_request))
         }
     }
 
@@ -93,7 +93,7 @@ impl System{
                             asked_hash_map.insert(ask.to_string(), res.0);
                             result.insert(ask.to_string(), Vec::<String>::new());
                         }
-                        None => return Err(format!("La colonne {} n'existe pas pour la table {}", ask, table_name))
+                        None => return Err(format!("The column {} doesn't exist for the table {}", ask, table_name))
                     }
                 }
             }
@@ -132,7 +132,7 @@ impl System{
             }
             return Ok(result);
         }else{  
-            return Err(format!("The table {} don't exist", table_name));
+            return Err(format!("The table {} don't already exist", table_name));
         }
     }
 
@@ -166,10 +166,10 @@ impl System{
                         2 => {
                             match split_type[1]{
                                 "DEFAULT" => data_text += &format!("{} {} DEFAULT {}\n", var_name, split_type[0], arg[&format!("${}", &var_name) as &str]),
-                                _ => return Err(String::from("To many arguments"))
+                                _ => return Err(format!("{} keyword is unvalid here", split_type[1]))
                             }
                         },
-                        _ => return Err(String::from("To many arguments"))
+                        _ => return Err(format!("{} isn't a valid parameter for a column.", split_type.join(" ")))
                     }
                 }
             }
@@ -208,12 +208,12 @@ impl System{
                                         match arg_in_request{
                                             Some(val) => {
                                                 if !self.type_gestion.good_type_and_good_value(&data_type, &val){
-                                                    return Err(format!("Le type de {} ne correspond pas au type attendu.", val))
+                                                    return Err(format!("The type {} wasn't expected.", val))
                                                 } 
                                                 line_text = self.push_new_txt(line_text, val, &format!("{}_{}", line_file_name, data_name));
                                             },
                                             None =>  {
-                                                return Err(format!("La colonne {} ne peut pas etre nulle !", data_name));
+                                                return Err(format!("The column {} was defined with the NOT NULL parameter !", data_name));
                                             }                               
                                         }   
                                     }_ =>{}
@@ -224,7 +224,7 @@ impl System{
                                 match arg_in_request{
                                     Some(val) => {
                                         if !self.type_gestion.good_type_and_good_value(&data_type, &val){
-                                            return Err(format!("Le type de {} ne correspond pas au type attendu.", val))
+                                            return Err(format!("The type {} wasn't expected.", val))
                                         }
                                         line_text = self.push_new_txt(line_text, val, &format!("{}_{}", line_file_name, data_name));
                                     }
@@ -243,14 +243,14 @@ impl System{
                         line_file.push(&line_text);
                         return Ok(());
                     }else{
-                        return Err(format!("Il existe déjà une ligne avec pour clé primaire {}", p_key));
+                        return Err(format!("The line with the primary key {} already exists", p_key));
                     }
                 }None => {
-                    return Err(String::from("Vous n'avez pas indiqué de clé primaire."));
+                    return Err(String::from("Primary key missing."));
                 }
             }
         }else{
-            return Err(format!("La table {} n'éxiste pas.", name));
+            return Err(format!("The table {} don't already exists.", name));
         }
     }
 
@@ -292,7 +292,7 @@ impl System{
             self.clear_line_file(line_file);
             return Ok(())
         }else{
-            return Err(format!("The table {} don't exist already", table_name))
+            return Err(format!("The table {} don't already exists.", table_name))
         }
     }
 
@@ -342,7 +342,7 @@ impl System{
             self.main_file.replace(&format!("{}\n", table_name), "");
             return Ok(());
         }else{
-            return Err(format!("La table {} n'existe pas.", table_name));
+            return Err(format!("The table {} don't already exists.", table_name));
         }
     }
 }

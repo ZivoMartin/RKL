@@ -84,7 +84,7 @@ impl Interpreteur {
             }
             return Ok(());
         }else{
-            return Err(format!("DROP {} n'est pas une commande valide", vect_req.join(" ")));
+            return Err(format!("DROP {} isn't a valid command.", vect_req.join(" ")));
         }
     }
 
@@ -114,7 +114,7 @@ impl Interpreteur {
                         i += 1;
                     } 
                     if asked.len() == 0{
-                        return Err(String::from("You selected nothing"));
+                        return Err(String::from("Nothing selected"));
                     }else{
                         asked.pop();
                     }
@@ -122,16 +122,18 @@ impl Interpreteur {
                 }
             }
             if arg.len() > 0{
-                match arg.remove(0){
+                let from_keyword = arg.remove(0);
+                match from_keyword{
                     "FROM" => {
                         let table_name = arg.remove(0);
                         if self.is_correct_name(table_name){
                             arguments.insert(String::from(":table_name"), table_name.to_string());
                             if arg.len() > 0{
-                                match arg.remove(0){
+                                let keyword = arg.remove(0);
+                                match keyword{
                                     "WHERE" => {
                                         if arg.len() == 0{
-                                            return Err(String::from("Condition missing"));
+                                            return Err(String::from("Error: Condition missing."));
                                         }else{
                                             let condition = arg.join(" ");
                                             let cleaning = self.clean_the_condition(condition, &mut arguments);
@@ -141,11 +143,11 @@ impl Interpreteur {
                                                     self.convert_in_str_hashmap(&arguments, &mut result);
                                                     return self.system.new_request(result);
                                                 }
-                                                None => return Err(String::from("The condition is incorrect.")),
+                                                None => return Err(String::from("The condition doesn't respect the syntax rules.")),
                                             }
                                         }
                                     }
-                                    _ => return Err(String::from("Bad keyword"))
+                                    _ => return Err(format!("Bad keyword: {}", keyword))
                                 }
                             }else{
                                 arguments.insert(String::from(":condition"), String::from("1 == 1"));
@@ -153,67 +155,76 @@ impl Interpreteur {
                                 return self.system.new_request(result);
                             }
                         }else{
-                            return Err(format!("{} is not a correct name for a table.", table_name));
+                            return Err(format!("{} isn't a correct name for a table.", table_name));
                         }
                     },   
-                    _ => return Err(String::from("Bad syntax in the select request.")),
+                    _ => return Err(format!("{} found where Frome was expected", from_keyword)),
                 }
             }else{
-                return Err(String::from("FROM is missing."));
+                return Err(String::from("Nothing found where FROM was expected."));
             }
         }else{
-            return Err(String::from("Invalid request."));
+            return Err(format!("The request 'SELECT {}' isn't valid.", vect_req.join(" ")));
         }
     }
 
 
     fn delete_line(&mut self, mut vect_req: Vec::<&str>) -> Result<(), String>{
-        if vect_req.len() >= 2 && vect_req.remove(0) == "FROM"{
-            if vect_req[0].len() > 2 && self.is_correct_name(&vect_req[0]){
-                let table_name = vect_req.remove(0);
-                let mut arguments = HashMap::<String, String>::new();
-                let mut result = HashMap::<&str, &str>::new();
-                arguments.insert(String::from(":table_name"), table_name.to_string());
-                arguments.insert(String::from(":request"), String::from("DELETE_LINE_IF"));
-                if vect_req.len() == 0{
-                    arguments.insert(String::from(":condition"), String::from("1 == 1"));
-                    self.convert_in_str_hashmap(&arguments, &mut result);
-                    match self.system.new_request(result){
-                        Ok(_) => return Ok(()),
-                        Err(e) => return Err(e.to_string()),
+        if vect_req.len() >= 2{
+            let from_keyword = vect_req.remove(0);
+            if from_keyword == "FROM"{
+                if vect_req[0].len() > 2 && self.is_correct_name(&vect_req[0]){
+                    let table_name = vect_req.remove(0);
+                    let mut arguments = HashMap::<String, String>::new();
+                    let mut result = HashMap::<&str, &str>::new();
+                    arguments.insert(String::from(":table_name"), table_name.to_string());
+                    arguments.insert(String::from(":request"), String::from("DELETE_LINE_IF"));
+                    if vect_req.len() == 0{
+                        arguments.insert(String::from(":condition"), String::from("1 == 1"));
+                        self.convert_in_str_hashmap(&arguments, &mut result);
+                        match self.system.new_request(result){
+                            Ok(_) => return Ok(()),
+                            Err(e) => return Err(e.to_string()),
+                        }
+                    }else{
+                        let key_word = vect_req.remove(0); 
+                        match key_word{
+                            "WHERE" => {
+                                if vect_req.len() == 0{
+                                    return Err(String::from("Condition missing"));
+                                }else{
+                                    let condition = vect_req.join(" ");
+                                    let cleaning = self.clean_the_condition(condition, &mut arguments);
+                                    match cleaning{
+                                        Some(condition) => {
+                                            arguments.insert(String::from(":condition"), condition);
+                                            self.convert_in_str_hashmap(&arguments, &mut result);
+                                            match self.system.new_request(result){
+                                                Ok(_) => return Ok(()),
+                                                Err(e) => return Err(e.to_string()),
+                                            }
+                                        }
+                                        None => return Err(String::from("The condition doesn't respect the syntax rules."))
+                                    }
+                                }
+                            }   
+                            _ => {
+                                return Err(format!("Bad key_word here: {}", key_word));
+                            }
+                        }
                     }
                 }else{
-                    let key_word = vect_req.remove(0); 
-                    match key_word{
-                        "WHERE" => {
-                            if vect_req.len() == 0{
-                                return Err(String::from("Condition missing"));
-                            }else{
-                                let condition = vect_req.join(" ");
-                                let cleaning = self.clean_the_condition(condition, &mut arguments);
-                                match cleaning{
-                                    Some(condition) => {
-                                        arguments.insert(String::from(":condition"), condition);
-                                        self.convert_in_str_hashmap(&arguments, &mut result);
-                                        match self.system.new_request(result){
-                                            Ok(_) => return Ok(()),
-                                            Err(e) => return Err(e.to_string()),
-                                        }
-                                    }
-                                    None => return Err(String::from("The condition is incorrect."))
-                                }
-                            }
-                        }   
-                        _ => {
-                            return Err(format!("Bad key_word here: {}", key_word));
-                        }
+                    if vect_req[0].len() <= 2{
+                        return Err(String::from("Nothing found when a table name was expected."));
+                    }else{
+                        return Err(format!("'{}' isn't a correct name for a table.", vect_req[0]));
                     }
                 }
             }else{
-                return Err(String::from("Le nom de table indiqué n'est pas correct."));
+                return Err(format!("'{}' found whene FROM was expected", from_keyword));
             }
-        }else{
-            return Err(String::from("Votre requête de type DELETE n'est pas valide."));
+        }else {
+            return Err(format!("The request 'DELETE {}' isn't valid.", vect_req.join(" ")));
         }
     }
 
@@ -328,6 +339,7 @@ impl Interpreteur {
             arguments.insert(":table_name".to_string(), table_name.to_string());
             let mut req = vect_req.join(" ");
             req = req.replace(", ", ",");
+            req = req.replace(" ,", ",");
             let split_req_value: Vec<&str> = req.split(" VALUES ").collect();
             if split_req_value.len() == 2{
                 let mut arg_s = split_req_value[0].to_string();
@@ -344,7 +356,7 @@ impl Interpreteur {
                                     arguments.insert(args[i].to_string(), values[i].to_string());
                                 }
                             }else{
-                                return Err(format!("Ce nom n'est pas correct pour une variable: {}", args[i]));
+                                return Err(format!("This name isn't correct for a variable: {}", args[i]));
                             }
                         }
                         
@@ -357,13 +369,17 @@ impl Interpreteur {
                         return Err(String::from("It seems like the number of values is different then the number of arguments"));
                     }
                 }else{
-                    return Err(String::from("La syntaxe de votre requete n'est pas bonne."));
+                    return Err(String::from("A parenthésis is missing in your request."));
                 }
             }else{
-                return Err(String::from("Invalid request."));
+                if split_req_value.len() < 2{
+                    return Err(String::from("The 'VALUES' keyword is missing."));
+                }else{
+                    return Err(String::from("The 'VALUES' keyword was found on two occasions."));
+                }
             }
         }else{
-            return Err(format!("The name {} isn't valid", table_name));
+            return Err(format!("The name {} isn't valid for a table", table_name));
         }
 
     }
@@ -375,7 +391,7 @@ impl Interpreteur {
                 "TABLE" => {
                     let mut new_table = String::from(vect_req.join(" "));
                     if new_table.pop() != Some(')'){
-                        return Err(String::from("Une parenthèse a été mal fermée."));
+                        return Err(String::from("A parenthésis is missing in your request."));
                     }else{
                         _ = new_table.replace(", ", ",");
                         let mut splited_req_for_name: Vec::<&str> = new_table.split("(").collect();
@@ -402,7 +418,7 @@ impl Interpreteur {
                                                     arguments.insert(":primary".to_string(), String::from(column_name));
                                                     bonus_param = "NOTNULL".to_string();
                                                 }else{
-                                                    return Err(format!("Vous avez declaré une primary key à deux reprise, {} n'est donc pas une primary key.", column_name));
+                                                    return Err(format!("It seems that you have declared two primary keys, so '{}' will not be primary key.", column_name));
                                                 } 
                                             }
                                             "FOREIGN KEY" => {
@@ -420,19 +436,19 @@ impl Interpreteur {
                                                         bonus_param = String::from("DEFAULT");
                                                         arguments.insert(format!("${}", String::from(column_name)), other);
                                                     }else{
-                                                        return Err(format!("{} n'est pas une valeur correcte pour le type {}", other, type_data));
+                                                        return Err(format!("{} isn't an appropriate value for the type {}.", other, type_data));
                                                     }
                                                 }else{
-                                                    return Err(format!("Unknow {}", other));
+                                                    return Err(format!("{} is unknow by the system.", other));
                                                 }
                                             }
                                         }   
                                     }
                                     arguments.insert(String::from(column_name), type_data.to_string()+" "+&bonus_param);    
                                 }else if !self.type_gestion.is_correct_type(type_data){
-                                    return Err(format!("Le type {} n'est pas accepté.", type_data));
+                                    return Err(format!("The type {} isn't correct.", type_data));
                                 }else{
-                                    return Err(format!("Le nom {} n'est pas accepté.", column_name));
+                                    return Err(format!("The name {} isn't correct.", column_name));
                                 }
                                 
                             }
@@ -444,10 +460,13 @@ impl Interpreteur {
                                     Err(e) => return Err(e.to_string()),
                                 }
                             }else{
-                                return Err(String::from("Vous n'avez pas explicitement indiqué de clé primaire"));
+                                return Err(String::from("Primary key is missing."));
                             }
                         }else{
-                            return Err(format!("Erreur lors de la creation de la table {}", table_name));
+                            if splited_req_for_name.len() < 2{
+                                return Err(String::from("You have to specify the column of a new table between parenthesis: (column1 type, column2 type ...)"));
+                            }
+                            return Err(format!("{} isn't a correct name for a table.", table_name));
                         }
                     }
                 }
