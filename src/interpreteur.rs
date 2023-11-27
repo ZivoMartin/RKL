@@ -24,32 +24,20 @@ impl Interpreteur {
             let type_request = vect_req.remove(0);
             match type_request{
                 "DROP" => {
-                    match self.drop_req(vect_req){
-                        Ok(_) => return Ok(None),
-                        Err(e) => return Err(e.to_string())
-                    }
+                    self.drop_req(vect_req)?
                 }
                 "CREATE" => {
-                    match self.create_req(vect_req){
-                        Ok(_) => return Ok(None),
-                        Err(e) => return Err(e.to_string())
-                    }
+                    self.create_req(vect_req)?
                 }
                 "INSERT" => {
                     if vect_req.len() >= 5 && vect_req.remove(0) == "INTO" && vect_req.contains(&"VALUES"){
-                        match self.insert_request(vect_req){
-                            Ok(_) => return Ok(None),
-                            Err(e) => return Err(e.to_string())
-                        }
+                        self.insert_request(vect_req)?
                     }else{
                         return Err(String::from("Invalid request."));
                     }
                 }
                 "DELETE" => {
-                    match self.delete_line(vect_req){
-                        Ok(_) => return Ok(None),
-                        Err(e) => return Err(e.to_string())
-                    }
+                    self.delete_line(vect_req)?
                 }
                 "SELECT" => {
                     match self.select_request(vect_req){
@@ -62,7 +50,7 @@ impl Interpreteur {
                 }
             }
         }
-        return Err(String::from("Votre requête ne respecte pas les regles de syntaxe"));
+        return Ok(None);
     }
 
     fn drop_req(&mut self, vect_req: Vec::<&str>) -> Result<(), String>{
@@ -73,10 +61,7 @@ impl Interpreteur {
                 "TABLE" => {
                     for table_to_drop in vect_req.iter().skip(1){
                         arguments.insert(":table_name", table_to_drop);
-                        match self.system.new_request(arguments.clone()){
-                            Ok(_) => {}
-                            Err(e) => return Err(e.to_string()),
-                        }
+                        self.system.new_request(arguments.clone())?;
                         arguments.remove(":table_name");
                     }
                 }
@@ -182,10 +167,7 @@ impl Interpreteur {
                     if vect_req.len() == 0{
                         arguments.insert(String::from(":condition"), String::from("1 == 1"));
                         self.convert_in_str_hashmap(&arguments, &mut result);
-                        match self.system.new_request(result){
-                            Ok(_) => return Ok(()),
-                            Err(e) => return Err(e.to_string()),
-                        }
+                        self.system.new_request(result)?;
                     }else{
                         let key_word = vect_req.remove(0); 
                         match key_word{
@@ -199,10 +181,7 @@ impl Interpreteur {
                                         Some(condition) => {
                                             arguments.insert(String::from(":condition"), condition);
                                             self.convert_in_str_hashmap(&arguments, &mut result);
-                                            match self.system.new_request(result){
-                                                Ok(_) => return Ok(()),
-                                                Err(e) => return Err(e.to_string()),
-                                            }
+                                            self.system.new_request(result)?;
                                         }
                                         None => return Err(String::from("The condition doesn't respect the syntax rules."))
                                     }
@@ -226,6 +205,7 @@ impl Interpreteur {
         }else {
             return Err(format!("The request 'DELETE {}' isn't valid.", vect_req.join(" ")));
         }
+        Ok(())
     }
 
     fn replace_the_space(&self, cond: String, operator: &str, ok_to_replace: bool) -> Option<String>{
@@ -361,10 +341,7 @@ impl Interpreteur {
                         }
                         
                         self.convert_in_str_hashmap(&arguments, &mut result);
-                        match self.system.new_request(result){
-                            Ok(_) => return Ok(()),
-                            Err(e) => return Err(e.to_string()),
-                        }
+                        self.system.new_request(result)?;
                     }else{
                         return Err(String::from("It seems like the number of values is different then the number of arguments"));
                     }
@@ -381,7 +358,7 @@ impl Interpreteur {
         }else{
             return Err(format!("The name {} isn't valid for a table", table_name));
         }
-
+        Ok(())
     }
 
     fn create_req(&mut self, mut vect_req: Vec::<&str>) -> Result<(), String>{
@@ -455,10 +432,8 @@ impl Interpreteur {
                             if p_key{
                                 let mut result = HashMap::<&str, &str>::new();
                                 self.convert_in_str_hashmap(&arguments, &mut result);
-                                match self.system.new_request(result){
-                                    Ok(_) => return Ok(()),
-                                    Err(e) => return Err(e.to_string()),
-                                }
+                                self.system.new_request(result)?;
+                                Ok(())
                             }else{
                                 return Err(String::from("Primary key is missing."));
                             }

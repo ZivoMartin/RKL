@@ -9,7 +9,6 @@ pub struct System{
 }
 
 
-// #[allow(dead_code)]
 impl System{
 
     pub fn new() -> System{
@@ -20,35 +19,20 @@ impl System{
         let type_request = arg.remove(":request").unwrap();
         match type_request{
             "CREATE" => {
-                match self.create_table(arg){
-                    Ok(_) => return Ok(None),
-                    Err(e) => return Err(e.to_string())
-                }
+                self.create_table(arg)?
             }
             "INSERT" => {
-                match self.insert_line(arg){
-                    Ok(_) => return Ok(None),
-                    Err(e) => return Err(e.to_string())
-                }
+                self.insert_line(arg)?
             }
             "DELETE_LINE" => {
-                match self.delete_line(arg[":table_name"], arg[":primary"]){
-                    Ok(_) => return Ok(None),
-                    Err(e) => return Err(e.to_string())
-                }
+                self.delete_line(arg[":table_name"], arg[":primary"])?
             }
             "DELETE_TABLE" => {
-                match self.delete_table(arg[":table_name"]){
-                    Ok(_) => return Ok(None),
-                    Err(e) => return Err(e.to_string())
-                }
+                self.delete_table(arg[":table_name"])?
             }
             "DELETE_LINE_IF" => {
                 arg.insert(":asked", "");
-                match self.browse_lines(arg, "delete"){
-                    Ok(_) => return Ok(None),
-                    Err(e) => return Err(e.to_string())
-                }
+                self.browse_lines(arg, "delete")?;
             }
             "SELECT" => {
                 match self.browse_lines(arg, "select"){
@@ -58,6 +42,7 @@ impl System{
             }
             _ => return Err(format!("The keyword {} isn't valid.", type_request))
         }
+        Ok(None)
     }
 
     
