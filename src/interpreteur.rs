@@ -20,7 +20,10 @@ impl Interpreteur {
     }
 
     pub fn sqlrequest(&mut self, mut req: String) -> Result<Option<HashMap<String, Vec<String>>>, String>{
-        if req != "" && req.pop() == Some(';') && !req.contains("  "){
+        while req.contains("  "){
+            req = req.replace("  ", " ");
+        }
+        if req != "" && req.pop() == Some(';'){
             let mut vect_req: Vec<&str> = req.split(" ").collect();
             let type_request = vect_req.remove(0);
             match type_request{
@@ -47,11 +50,14 @@ impl Interpreteur {
                     }
                 }
                 _ => {
-                    return Err(format!("{} is unnknow by the system.", vect_req[0]));
+                    return Err(format!("{} is unnknow by the system.", type_request));
                 }
             }
+        }else if req != ""{
+            return Err(String::from("';' is missing."))
         }
-        return Ok(None);
+
+        Ok(None)
     }
 
     fn drop_req(&mut self, vect_req: Vec::<&str>) -> Result<(), String>{

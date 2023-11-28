@@ -48,7 +48,7 @@ impl View{
 
     pub fn new() -> Result<View, String> {
         let size_window = Xy::new(1400, 800);
-        let case_size = Xy::new(10, 20);
+        let case_size = Xy::new(15, 40);
         let sdl_context = sdl2::init()?;
         let video_subsystem = sdl_context.video()?;
         let window = video_subsystem.window("Rusteroids", size_window.x, size_window.y)
@@ -168,7 +168,7 @@ impl View{
 
     fn entry_key(&mut self){
         self.char_tab[self.cursor_pos.y as usize].remove(0);
-        let text = &self.char_tab[self.cursor_pos.y as usize];
+        let mut text = &self.char_tab[self.cursor_pos.y as usize];
         if text == "clear"{
             for i in 0..(self.cursor_pos.y+1){
                 self.char_tab[i as usize] = String::from(" ");
@@ -176,6 +176,33 @@ impl View{
             self.char_tab[0] = String::from(">");
             self.cursor_pos.change(1, 0);
         }else{
+            match self.interpreteur.sqlrequest(text.to_string()){
+                Ok(res) => {
+                    match res{
+                        Some(result) => {
+                            let keys: Vec::<String> = result.keys().cloned().collect();
+                            if keys.len() > 0{
+                                let mut i: usize = (self.cursor_pos.y + 1) as usize;
+                                self.cursor_pos.y += (keys[0].len() + 1) as u32;
+                                for key in &keys{
+                                    self.char_tab[i].push_str(&format!("| {} |", key));
+                                }
+                                for k in 0..keys[0].len(){
+                                    i += 1;
+                                    for j in 0..keys.len(){
+                                        self.char_tab[i].push_str(&format!("|{}|", result[&keys[j]][k]));
+                                    }
+                                }
+                            }
+                        }
+                        None => {}
+                    }
+                }   
+                Err(e) => {
+                    self.cursor_pos.y += 1;
+                    self.char_tab[self.cursor_pos.y as usize] = e;
+                }
+            }
             self.cursor_pos.change(1, self.cursor_pos.y + 1);
             self.char_tab[(self.cursor_pos.y) as usize] = String::from(">");
             if self.char_tab[(self.cursor_pos.y-1) as usize].len() == 0{
