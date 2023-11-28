@@ -10,7 +10,8 @@ use std::path::Path;
 use sdl2::ttf::Font;
 
 use crate::interpreteur::Interpreteur;
-
+use crate::text_file::TextFile;
+use crate::text_file::file_exists;
 
 #[allow(dead_code)]
 pub struct View{
@@ -24,6 +25,7 @@ pub struct View{
     background_color: Color,
     iter: u32,
     char_tab: Vec<String>,
+    ctrle: bool
 }
 
 struct Xy{
@@ -76,7 +78,8 @@ impl View{
             size_window: size_window,
             background_color: Color::RGB(0, 0, 0),
             iter: 0,
-            char_tab: char_vec
+            char_tab: char_vec,
+            ctrle: false
         })
     }
 
@@ -119,24 +122,35 @@ impl View{
                     Event::Quit {..} => {
                         break 'running;
                     },
-                    Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                        break 'running;
-                    },
-                    Event::KeyDown { keycode: Some(Keycode::Return), .. } => {
-                        self.entry_key();
-                    },
-                    Event::KeyDown { keycode: Some(Keycode::Right), .. } => {
-                        if self.cursor_pos.x < self.char_tab[self.cursor_pos.y as usize].len() as u32{
-                            self.cursor_pos.x += 1;
+                    Event::KeyDown { keycode, ..} => {
+                        match keycode.unwrap(){
+                            Keycode::LCtrl | Keycode::RCtrl => self.ctrle = true,
+                            Keycode::Backspace => self.delete_char(),
+                            Keycode::V => {
+                                if self.ctrle{
+                                    
+                                }
+                            },
+                            Keycode::Left => {
+                                if self.cursor_pos.x > 1{
+                                    self.cursor_pos.x -= 1;
+                                }
+                            },
+                            Keycode::Right => {
+                                if self.cursor_pos.x < self.char_tab[self.cursor_pos.y as usize].len() as u32{
+                                    self.cursor_pos.x += 1;
+                                }
+                            },
+                            Keycode::Return => self.entry_key(),
+                            Keycode::Escape => break 'running,
+                            _ => {}
                         }
                     },
-                    Event::KeyDown { keycode: Some(Keycode::Left), .. } => {
-                        if self.cursor_pos.x > 1{
-                            self.cursor_pos.x -= 1;
+                    Event::KeyUp { keycode, ..} => {
+                        match keycode.unwrap(){
+                            Keycode::LCtrl | Keycode::RCtrl => self.ctrle = false,
+                            _ => {}
                         }
-                    },
-                    Event::KeyDown { keycode: Some(Keycode::Backspace), .. } => {
-                        self.delete_char();
                     },
                     Event::TextInput { text, .. } => {
                         if !text.is_empty() {
@@ -168,47 +182,93 @@ impl View{
 
     fn entry_key(&mut self){
         self.char_tab[self.cursor_pos.y as usize].remove(0);
-        let mut text = &self.char_tab[self.cursor_pos.y as usize];
+        let text = &self.char_tab[self.cursor_pos.y as usize];
         if text == "clear"{
             for i in 0..(self.cursor_pos.y+1){
                 self.char_tab[i as usize] = String::from(" ");
             }
             self.char_tab[0] = String::from(">");
             self.cursor_pos.change(1, 0);
+        }else if text.starts_with(r"\i"){
+            let split: Vec<&str> = text.split_whitespace().collect(); 
+            if split.len() == 2{
+                if file_exists(split[1]){
+                    if split[1].ends_with(".sql") || split[1].ends_with(".txt"){
+                        let mut sql_file = TextFile::new(split[1].to_string());
+                        let mut f_text = sql_file.get_text();
+                        f_text = f_text.replace("\n", "");
+                        let mut all_request: Vec<&str> = f_text.split(";").collect();
+                        all_request.pop();
+                        for req in all_request{
+                            self.new_request(format!("{};", req));
+                        }
+                    }else{
+                        self.error_message(r"The file in arguments of \i have to be a sql file.");
+                    }
+                }else{
+                    self.error_message(&format!("The path {} is not valid.", split[1]));
+                }
+            }else{
+                self.error_message(r"\i take only a path to a .sql file in argument. Two arguments found here.");
+            }
+            self.replace_cursor();
         }else{
-            match self.interpreteur.sqlrequest(text.to_string()){
-                Ok(res) => {
-                    match res{
-                        Some(result) => {
-                            let keys: Vec::<String> = result.keys().cloned().collect();
-                            if keys.len() > 0{
-                                let mut i: usize = (self.cursor_pos.y + 1) as usize;
-                                self.cursor_pos.y += (keys[0].len() + 1) as u32;
-                                for key in &keys{
-                                    self.char_tab[i].push_str(&format!("| {} |", key));
-                                }
-                                for k in 0..keys[0].len(){
-                                    i += 1;
-                                    for j in 0..keys.len(){
-                                        self.char_tab[i].push_str(&format!("|{}|", result[&keys[j]][k]));
-                                    }
+            self.new_request(text.to_string());
+            self.replace_cursor();
+        }
+    }
+
+    fn new_request(&mut self, text: String){
+        match self.interpreteur.sqlrequest(text.to_string()){
+            Ok(res) => {
+                match res{
+                    Some(result) => {
+                        let keys: Vec::<String> = result.keys().cloned().collect();
+                        if keys.len() > 0{
+                            let mut i: usize = (self.cursor_pos.y + 1) as usize;
+                            self.cursor_pos.y += (result[&keys[0]].len() + 1) as u32;
+                            for key in &keys{
+                                self.char_tab[i].push_str(&format!("| {} |", key));
+                            }
+                            for k in 0..result[&keys[0]].len(){
+                                i += 1;
+                                for j in 0..keys.len(){
+                                    self.char_tab[i].push_str(&format!("|{}|", result[&keys[j]][k]));
                                 }
                             }
                         }
-                        None => {}
                     }
-                }   
-                Err(e) => {
-                    self.cursor_pos.y += 1;
-                    self.char_tab[self.cursor_pos.y as usize] = e;
+                    None => {}
                 }
-            }
-            self.cursor_pos.change(1, self.cursor_pos.y + 1);
-            self.char_tab[(self.cursor_pos.y) as usize] = String::from(">");
-            if self.char_tab[(self.cursor_pos.y-1) as usize].len() == 0{
-                self.char_tab[(self.cursor_pos.y-1) as usize] = String::from(" ");
+            }   
+            Err(e) => {
+               self.error_message(&e);
             }
         }
-        
+    }
+
+    fn error_message(&mut self, e: &str){
+        if self.cursor_pos.y < (self.char_tab.len()-1) as u32{
+            self.cursor_pos.y += 1;
+        }
+        self.char_tab[self.cursor_pos.y as usize] = e.to_string();
+    }
+
+    fn replace_cursor(&mut self){
+        self.cursor_pos.change(1, self.cursor_pos.y + 1);
+        if self.cursor_pos.y >= self.char_tab.len() as u32{
+            let nb_line_to_delete = self.cursor_pos.y - (self.char_tab.len() as u32) + 1;
+            self.cursor_pos.y = (self.char_tab.len() - 1) as u32;
+            for _ in 0..nb_line_to_delete{
+                for i in 0..(self.char_tab.len()-1){
+                    self.char_tab[i] = self.char_tab[i+1].clone()
+                }
+            }
+            self.cursor_pos.y = (self.char_tab.len()-1) as u32;
+        }
+        self.char_tab[(self.cursor_pos.y) as usize] = String::from(">");
+        if self.char_tab[(self.cursor_pos.y-1) as usize].len() == 0{
+            self.char_tab[(self.cursor_pos.y-1) as usize] = String::from(" ");
+        }
     }
 }
