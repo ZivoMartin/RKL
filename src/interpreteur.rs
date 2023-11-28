@@ -2,13 +2,14 @@ use crate::system::System;
 use std::collections::HashMap;
 use crate::type_gestion::TypeGestion;
 
+#[allow(dead_code)]
 pub struct Interpreteur {
     system: System,
     authorized_char_for_variable: &'static str,
     type_gestion: TypeGestion
 }
 
-
+#[allow(dead_code)]
 impl Interpreteur {
     pub fn new() -> Interpreteur{
         Interpreteur{
