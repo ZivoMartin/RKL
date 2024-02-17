@@ -53,7 +53,7 @@ impl View{
         let case_size = Xy::new(15, 40);
         let sdl_context = sdl2::init()?;
         let video_subsystem = sdl_context.video()?;
-        let window = video_subsystem.window("Rusteroids", size_window.x, size_window.y)
+        let window = video_subsystem.window("RKL", size_window.x, size_window.y)
             .position_centered()
             .build()
             .expect("could not initialize video subsystem");

@@ -3,7 +3,6 @@ use crate::text_file::file_exists;
 use crate::type_gestion::TypeGestion;
 use std::collections::HashMap;
 
-#[allow(dead_code)]
 pub struct System{
     main_file: TextFile,
     type_gestion: TypeGestion
